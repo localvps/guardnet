@@ -37,11 +37,7 @@ function Main() {
       </SideHead>
       <div className="scroll">
         <div className="profile-hero settings-hero">
-          <div className="av-edit">
-            <div className="av-edit"><Avatar src={me.avatar} name={me.name} color={me.color} size={112} /><button type="button" className="av-cam" onClick={() => document.getElementById('gn-av-up')?.click()} aria-label="تغییر عکس"><Icon name="camera" /></button><input id="gn-av-up" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ''; }} /></div>
-            <button type="button" className="av-cam" onClick={() => file.current?.click()} aria-label="تغییر عکس"><Icon name="camera" /></button>
-            <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ''; }} />
-          </div>
+          <div className="av-edit"><Avatar src={me.avatar} name={me.name} color={me.color} size={112} /><button type="button" className="av-cam" onClick={() => file.current?.click()} aria-label="تغییر عکس"><Icon name="camera" /></button><input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ''; }} /></div>
           <div className="ph-name"><NameLine name={me.name} user={me} /></div>
           <div className="ph-status online">آنلاین</div>
         </div>

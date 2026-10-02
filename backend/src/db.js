@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS security_settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS ip_blocks(ip TEXT PRIMARY KEY, reason TEXT, created_at INTEGER, created_by INTEGER, expires_at INTEGER);
 `);
 
+// Migrations for existing databases
+try { db.exec('ALTER TABLE messages ADD COLUMN ttl INTEGER DEFAULT 0'); } catch {}
+try { db.exec('ALTER TABLE messages ADD COLUMN expires_at INTEGER'); } catch {}
+
 const cache = new Map();
 const prep = (sql) => {
   let s = cache.get(sql);

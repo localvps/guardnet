@@ -158,7 +158,16 @@ chatScoped.post('/:cid/messages', h((req) => {
     if (sched <= now() + 5000) sched = null;
     else if (sched > now() + 365 * 86400e3) err(400, 'زمان‌بندی حداکثر تا یک سال آینده ممکن است.');
   }
-  const mid = insertMessage(cid, u.id, type, text, data, { reply_to: replyTo, sched_at: sched, silent: !!b.silent });
+  // Self-destructing messages (TTL) — only in private chats, not for service/scheduled
+  let ttl = 0;
+  if (b.ttl && c.type === 'private' && !sched && type !== 'service') {
+    ttl = int(b.ttl);
+    const TTL_OPTS = [0, 3, 10, 30, 60, 300, 3600, 86400, 604800];
+    if (!TTL_OPTS.includes(ttl)) err(400, 'زمان خودمخفی نامعتبر است.');
+  }
+  const mid = insertMessage(cid, u.id, type, text, data, { reply_to: replyTo, sched_at: sched, silent: !!b.silent, ttl: ttl });
+  // Set expires_at for self-destructing messages (timer starts at send time)
+  if (ttl) run('UPDATE messages SET expires_at=? WHERE id=?', now() + ttl * 1000, mid);
   run("UPDATE members SET draft='', last_read=MAX(last_read, ?) WHERE chat_id=? AND user_id=?", sched ? 0 : mid, cid, u.id);
   if (c.type === 'private') run('UPDATE members SET left=0 WHERE chat_id=?', cid);
   if (!sched) {

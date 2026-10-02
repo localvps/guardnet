@@ -92,6 +92,14 @@ export function startScheduler() {
       for (const r of q('SELECT id FROM messages WHERE sched_at IS NOT NULL AND sched_at<=? AND deleted=0', t)) {
         releaseScheduled(r.id);
       }
+      // Self-destructing messages: delete expired ones and notify members
+      const expired = q('SELECT id, chat_id FROM messages WHERE expires_at IS NOT NULL AND expires_at<=? AND deleted=0', t);
+      for (const r of expired) {
+        run('UPDATE messages SET deleted=1 WHERE id=?', r.id);
+        for (const m of q('SELECT user_id FROM members WHERE chat_id=? AND left=0', r.chat_id)) {
+          if (hub.online(m.user_id)) hub.send(m.user_id, 'message:delete', { chat_id: r.chat_id, ids: [r.id] });
+        }
+      }
       run('DELETE FROM stories WHERE expires_at<?', t);
       run("DELETE FROM qr_logins WHERE expires_at<? AND status<>'approved'", t - 60e3);
       run('DELETE FROM qr_logins WHERE expires_at<?', t - 300e3);

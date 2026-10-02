@@ -200,6 +200,17 @@
 .b-meta .m-check { width: 17px; height: 17px; }
 .b-meta .m-check.read { color: var(--check-read); }
 .b-meta .m-fail { width: 16px; height: 16px; color: var(--danger); }
+.b-ttl {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11.5px; font-weight: 600; color: var(--danger);
+  margin-inline-start: 6px; white-space: nowrap;
+  animation: ttl-pulse 2s ease-in-out infinite;
+}
+.b-ttl .m-ic { width: 12px; height: 12px; }
+@keyframes ttl-pulse { 0%, 100% { opacity: .7; } 50% { opacity: 1; } }
+.ttl-bar { --cc-color: var(--danger); }
+.ttl-bar .cc-ic { color: var(--danger); }
+.ttl-bar .cc-title { color: var(--danger); }
 .b-meta.overlay {
   bottom: 8px; inset-inline-end: 8px;
   padding: 4px 8px; border-radius: 10px;
@@ -293,6 +304,15 @@
 .msg.out .v-wave span.on { background: currentColor; }
 .v-time { font-size: 12.5px; color: var(--meta-in); }
 .msg.out .v-time { color: var(--meta-out); }
+.v-speed {
+  flex: none; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 2px 7px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent); transition: background var(--t-fast), transform var(--t-fast);
+  line-height: 1.4;
+}
+.v-speed:hover { transform: scale(1.06); }
+.msg.out .v-speed { background: rgba(255, 255, 255, .16); color: inherit; }
+[data-theme='light'] .msg.out .v-speed { background: rgba(79, 174, 78, .16); color: #2f7d32; }
 
 /* poll */
 .t-poll, .t-location, .t-contact, .t-gif { padding-bottom: 24px; }
@@ -357,10 +377,11 @@
 
 /* reactions */
 .b-reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
-.b-reacts::after { content: ''; width: 54px; height: 1px; flex: none; }
-.msg.out .b-reacts::after { width: 70px; }
+.b-reacts::after { content: ''; width: 58px; height: 28px; flex: none; }
+.msg.out .b-reacts::after { width: 74px; }
 .bubble:has(.b-reacts) .b-text > .meta-space { display: none; }
-.bubble:has(.b-reacts) .b-meta:not(.overlay) { bottom: 9px; }
+.bubble:has(.b-reacts) .b-meta:not(.overlay) { bottom: 7px; }
+.bubble:has(.b-reacts):not(.bare):not(.media-only) { padding-bottom: 22px; }
 .media-only .b-reacts, .bare .b-reacts { margin: 6px 0 0; }
 .media-only:has(.b-reacts) .b-meta.overlay { bottom: 40px; }
 .bare:has(.b-reacts) .b-meta.overlay { bottom: 36px; }

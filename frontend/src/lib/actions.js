@@ -356,12 +356,12 @@ function saveDraftNow() {
 
 /* ------------------------------------------------------------------ messages */
 let tmpId = -1;
-export async function sendMessage(cid, { type = 'text', text = '', data = {}, reply_to, silent, sched_at }) {
+export async function sendMessage(cid, { type = 'text', text = '', data = {}, reply_to, silent, sched_at, ttl }) {
   const me = getState().me;
-  const temp = sched_at ? null : { id: tmpId--, chat_id: cid, sender_id: me.id, type, text, data, created_at: Date.now(), pending: true, reactions: {}, reply: reply_to ? { id: reply_to } : undefined };
+  const temp = sched_at ? null : { id: tmpId--, chat_id: cid, sender_id: me.id, type, text, data, created_at: Date.now(), pending: true, reactions: {}, reply: reply_to ? { id: reply_to } : undefined, ttl: ttl || 0, expires_at: ttl ? Date.now() + ttl * 1000 : null };
   if (temp) setMsgs(cid, (c) => (c.loaded && !c.hasNewer ? { list: [...c.list, temp] } : {}));
   try {
-    const r = await api(`/chats/${cid}/messages`, { method: 'POST', body: { type, text, data, reply_to, silent, sched_at } });
+    const r = await api(`/chats/${cid}/messages`, { method: 'POST', body: { type, text, data, reply_to, silent, sched_at, ttl } });
     if (temp) setMsgs(cid, (c) => {
       const has = c.list.some((m) => m.id === r.message.id);
       return { list: has ? c.list.filter((m) => m.id !== temp.id) : c.list.map((m) => (m.id === temp.id ? r.message : m)) };

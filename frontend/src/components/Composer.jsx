@@ -14,6 +14,7 @@ export default function Composer({ c }) {
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(null);
   const [mention, setMention] = useState(null);
+  const [ttl, setTtl] = useState(0);
   const ta = useRef(null);
   const fileRef = useRef(null);
   const mediaRef = useRef(null);
@@ -56,7 +57,7 @@ export default function Composer({ c }) {
     setText(''); setDraft(c.id, ''); setState({ reply: null }); setMention(null);
     sendTyping(c.id, 'text', true);
     if (c.draft) api(`/chats/${c.id}/me`, { method: 'PATCH', body: { draft: '' } }).catch(() => {});
-    await sendMessage(c.id, { text: t, reply_to: r?.id, ...opts });
+    await sendMessage(c.id, { text: t, reply_to: r?.id, ttl: c.type === 'private' ? ttl : 0, ...opts });
   }
   const onKey = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -80,9 +81,14 @@ export default function Composer({ c }) {
     onChange(v);
     requestAnimationFrame(() => { if (el) { el.focus({ preventScroll: true }); el.selectionStart = el.selectionEnd = a + s.length; } });
   };
+  const TTL_OPTS = [
+    [0, 'بدون خودمخفی'], [3, '۳ ثانیه'], [10, '۱۰ ثانیه'], [30, '۳۰ ثانیه'],
+    [60, '۱ دقیقه'], [300, '۵ دقیقه'], [3600, '۱ ساعت'], [86400, '۲۴ ساعت'], [604800, '۷ روز'],
+  ];
   const sendMenu = (e) => openMenu(e, [
     { icon: 'bellOff', label: 'ارسال بی‌صدا', onClick: () => submit({ silent: true }) },
     { icon: 'clock', label: 'زمان‌بندی پیام', onClick: () => openModal({ type: 'schedule', onPick: (ts) => submit({ sched_at: ts }) }) },
+    ...(c.type === 'private' ? [{ sep: true }, ...TTL_OPTS.map(([v, l]) => ({ icon: v === ttl ? 'check' : 'shield', label: l, onClick: () => setTtl(v) }))] : []),
   ], { anchor: sendBtn.current });
   const attachMenu = (e) => openMenu(e, [
     { icon: 'image', label: 'عکس یا ویدیو', onClick: () => mediaRef.current?.click() },
@@ -163,6 +169,16 @@ export default function Composer({ c }) {
             <div className="cc-text">{previewText(edit || reply)}</div>
           </div>
           <IconBtn icon="x" label="لغو" onClick={() => (edit ? cancelEdit() : setState({ reply: null }))} />
+        </div>
+      )}
+      {ttl > 0 && c.type === 'private' && !edit && (
+        <div className="compose-ctx glass ttl-bar">
+          <Icon name="shield" className="cc-ic" />
+          <div className="cc-body">
+            <div className="cc-title">پیام خودمخفی</div>
+            <div className="cc-text">پس از {TTL_OPTS.find((x) => x[0] === ttl)?.[1]} حذف می‌شود</div>
+          </div>
+          <IconBtn icon="x" label="لغو" onClick={() => setTtl(0)} />
         </div>
       )}
       <div className={cx('composer glass', rec && 'recording')}>

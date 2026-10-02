@@ -68,7 +68,7 @@ export function privatePeer(c, uid) {
 /** SQL fragment (uid is always an integer from the DB, never user input). */
 export const vis = (uid) => {
   const u = Number.parseInt(uid, 10) | 0;
-  return ` AND m.deleted=0 AND (m.sched_at IS NULL OR m.sender_id=${u}) AND NOT EXISTS(SELECT 1 FROM hidden h WHERE h.msg_id=m.id AND h.user_id=${u})`;
+  return ` AND m.deleted=0 AND (m.expires_at IS NULL OR m.expires_at > ${Date.now()}) AND (m.sched_at IS NULL OR m.sender_id=${u}) AND NOT EXISTS(SELECT 1 FROM hidden h WHERE h.msg_id=m.id AND h.user_id=${u})`;
 };
 
 export function msgPreview(m) {
@@ -84,6 +84,7 @@ export function messageJson(m, uid, chatType) {
   const d = {
     id: m.id, chat_id: m.chat_id, sender_id: m.sender_id, type: m.type, text: m.text || '', data,
     created_at: m.created_at, edited_at: m.edited_at, pinned: !!m.pinned, sched_at: m.sched_at, silent: !!m.silent,
+    ttl: m.ttl || 0, expires_at: m.expires_at || null,
     fwd: J(m.fwd),
   };
   if (m.reply_to) {
@@ -211,8 +212,8 @@ export function broadcastUser(uid) {
 export function releaseScheduled(mid) {
   const m = q1('SELECT * FROM messages WHERE id=? AND sched_at IS NOT NULL AND deleted=0', mid);
   if (!m) return null;
-  const nid = ex('INSERT INTO messages(chat_id,sender_id,type,text,data,reply_to,fwd,created_at,silent) VALUES(?,?,?,?,?,?,?,?,?)',
-    m.chat_id, m.sender_id, m.type, m.text, m.data, m.reply_to, m.fwd, now(), m.silent);
+  const nid = ex('INSERT INTO messages(chat_id,sender_id,type,text,data,reply_to,fwd,created_at,silent,ttl) VALUES(?,?,?,?,?,?,?,?,?,?)',
+    m.chat_id, m.sender_id, m.type, m.text, m.data, m.reply_to, m.fwd, now(), m.silent, m.ttl || 0);
   run('DELETE FROM messages WHERE id=?', mid);
   hub.send(m.sender_id, 'message:delete', { chat_id: m.chat_id, ids: [mid], scheduled: true });
   deliverMessage(nid);
@@ -249,8 +250,8 @@ export const service = (cid, actor, text) =>
   ex("INSERT INTO messages(chat_id,sender_id,type,text,data,created_at) VALUES(?,?,'service',?,'{}',?)", cid, actor, text, now());
 
 export const insertMessage = (cid, sender, type, text, data = {}, extra = {}) =>
-  ex('INSERT INTO messages(chat_id,sender_id,type,text,data,reply_to,fwd,created_at,sched_at,silent) VALUES(?,?,?,?,?,?,?,?,?,?)',
+  ex('INSERT INTO messages(chat_id,sender_id,type,text,data,reply_to,fwd,created_at,sched_at,silent,ttl) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
     cid, sender, type, text || '', JSON.stringify(data || {}), extra.reply_to || null, extra.fwd ? JSON.stringify(extra.fwd) : null,
-    now(), extra.sched_at || null, extra.silent ? 1 : 0);
+    now(), extra.sched_at || null, extra.silent ? 1 : 0, extra.ttl || 0);
 
 export const pickColor = () => COLORS[crypto.randomInt(COLORS.length)];

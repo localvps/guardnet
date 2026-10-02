@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { useStore, setState, getState, toast } from '../lib/store.js';
 import {
   meId, userName, userOf, react, pinMessage, openModal, deleteMessages, vote, retryMessage, cancelUpload, openPrivate, resolveAndOpen,
-  sendMessage, settings, forwardMessages,
+  sendMessage, settings, setSetting, forwardMessages,
 } from '../lib/actions.js';
 import { api, assetUrl } from '../lib/api.js';
 import { cx, fa, fmtTime, fmtFull, fmtSize, fmtDur, RichText, isEmojiOnly, previewText, fmtNum } from '../lib/format.jsx';
@@ -50,6 +50,7 @@ function Message({ m, c, first, last, flash, hl }) {
         <Body m={m} c={c} out={out} emojiN={emojiN} hl={hl} />
         {Object.keys(m.reactions || {}).length > 0 && <Reactions m={m} c={c} />}
         <Meta m={m} out={out} read={out && peerRead != null && peerRead >= m.id} channel={c.type === 'channel'} overlay={media || bare} />
+        {m.ttl && <TtlTimer m={m} />}
       </div>
     </div>
   );
@@ -168,18 +169,24 @@ function FileBox({ m }) {
 }
 
 let playing = null;
+const SPEEDS = [1, 1.5, 2];
 function Voice({ m, out }) {
   const d = m.data || {};
   const a = useRef(null);
-  const [st, setSt] = useState({ play: false, t: 0 });
+  const [st, setSt] = useState({ play: false, t: 0, speed: settings().voicePlaybackSpeed || 1 });
   const wave = d.wave?.length ? d.wave : Array.from({ length: 40 }, (_, i) => 0.25 + 0.5 * Math.abs(Math.sin(i * 1.7 + (m.id % 7))));
   const dur = d.dur || 0;
   useEffect(() => () => { if (playing === a.current) playing = null; a.current?.pause(); }, []);
+  useEffect(() => { if (a.current) a.current.playbackRate = st.speed; }, [st.speed]);
   const toggle = (e) => {
     e.stopPropagation();
     if (m.pending) { cancelUpload(m.id); return; }
     const el = a.current; if (!el) return;
-    if (el.paused) { if (playing && playing !== el) playing.pause(); playing = el; el.play().catch(() => toast('پخش ممکن نشد.', 'error')); } else el.pause();
+    if (el.paused) { if (playing && playing !== el) playing.pause(); playing = el; el.playbackRate = st.speed; el.play().catch(() => toast('پخش ممکن نشد.', 'error')); } else el.pause();
+  };
+  const cycleSpeed = (e) => {
+    e.stopPropagation();
+    setSt((s) => { const next = SPEEDS[(SPEEDS.indexOf(s.speed) + 1) % SPEEDS.length]; setSetting('voicePlaybackSpeed', next); return { ...s, speed: next }; });
   };
   const seek = (e) => {
     e.stopPropagation();
@@ -197,6 +204,7 @@ function Voice({ m, out }) {
           {wave.map((v, i) => <span key={i} style={{ height: `${Math.max(12, v * 100)}%` }} className={cx(i / wave.length < p && 'on')} />)}
         </div>
         <span className="v-time">{fmtDur(st.play || st.t ? st.t : dur)}<Spacer m={m} out={out} /></span>
+        <button type="button" className="v-speed" onClick={cycleSpeed} aria-label="سرعت پخش">{st.speed}×</button>
       </div>
       {!m.pending && <audio ref={a} src={assetUrl(d.url)} preload="none" onPlay={() => setSt((s) => ({ ...s, play: true }))} onPause={() => setSt((s) => ({ ...s, play: false }))}
         onEnded={() => setSt({ play: false, t: 0 })} onTimeUpdate={(e) => setSt((s) => ({ ...s, t: e.currentTarget.currentTime }))} />}
@@ -307,6 +315,25 @@ function Reactions({ m, c }) {
       ))}
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ self-destructing timer */
+function TtlTimer({ m }) {
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!m.expires_at) return;
+    const iv = setInterval(() => {
+      const left = m.expires_at - Date.now();
+      if (left <= 0) { clearInterval(iv); return; }
+      force((x) => x + 1);
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [m.expires_at]);
+  if (!m.expires_at) return null;
+  const left = Math.max(0, Math.ceil((m.expires_at - Date.now()) / 1000));
+  if (left <= 0) return null;
+  const fmtTtl = (s) => s < 60 ? `${fa(s)} ثانیه` : s < 3600 ? `${fa(Math.ceil(s / 60))} دقیقه` : s < 86400 ? `${fa(Math.ceil(s / 3600))} ساعت` : `${fa(Math.ceil(s / 86400))} روز`;
+  return <span className="b-ttl" title="زمان باقی‌مانده تا حذف"><Icon name="shield" className="m-ic" />{fmtTtl(left)}</span>;
 }
 
 /* ------------------------------------------------------------------ message context menu */
