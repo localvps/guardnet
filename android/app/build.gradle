@@ -1,0 +1,72 @@
+plugins {
+    id 'com.android.application'
+}
+
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+def hasReleaseKey = keystoreProps['storeFile'] as boolean
+
+android {
+    namespace 'ir.guardnet.app'
+    compileSdk 34
+    buildToolsVersion '34.0.0'
+    base {
+        archivesName = 'GuardNet'
+    }
+
+    defaultConfig {
+        applicationId 'ir.guardnet.app'
+        // Android 5.0 and newer. Below that the System WebView is not Chromium
+        // based (or cannot be updated), so a modern single page app cannot run.
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+        resConfigs 'fa', 'en'
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseKey) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+                // v1 for Android 5/6, v2 for 7+, v3 for key rotation on modern devices.
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // No shrinking: the app has zero dependencies, so R8 would only add
+            // risk around the WebView/permission callbacks for no size win.
+            minifyEnabled false
+            shrinkResources false
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
+        }
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    lint {
+        abortOnError false
+    }
+}

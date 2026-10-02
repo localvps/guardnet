@@ -1,0 +1,24 @@
+pluginManagement {
+    repositories {
+        // dl.google.com is blocked on some networks (and on a few build machines),
+        // so Google's Maven repository is consumed through public mirrors instead.
+        // Coordinates are identical; only the host changes.
+        maven { url "https://maven.aliyun.com/repository/google" }
+        maven { url "https://mirrors.cloud.tencent.com/nexus/repository/maven-public" }
+        maven { url "https://redirector.gvt1.com/edgedl/android/maven2" }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        maven { url "https://maven.aliyun.com/repository/google" }
+        maven { url "https://mirrors.cloud.tencent.com/nexus/repository/maven-public" }
+        maven { url "https://redirector.gvt1.com/edgedl/android/maven2" }
+        mavenCentral()
+    }
+}
+
+rootProject.name = "GuardNet"
+include ":app"

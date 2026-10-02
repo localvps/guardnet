@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GuardNet</string>
+    <string name="pick_file">انتخاب فایل</string>
+    <string name="exit_hint">برای خروج دوباره بزنید</string>
+</resources>

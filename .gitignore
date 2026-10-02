@@ -1,6 +1,5 @@
 node_modules/
 dist/
-desktop/dist-desktop/
 backend/data/
 *.log
 .env
@@ -8,3 +7,10 @@ backend/data/
 .DS_Store
 file/
 .claude/
+desktop/dist-desktop/
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/keystore.properties
+android/keystore/
