@@ -104,99 +104,110 @@ export default function Auth() {
     : step === 'code' ? (focus || code ? 'track' : 'idle') : 'idle';
   const progress = step === 'code' ? code.length / 6 : caret / 20;
 
+  // Two-panel layout: username step shows form + QR side by side (Telegram-style)
+  const showTwoPanel = step === 'username';
+
   return (
     <div className="auth">
       <div className="auth-bg" aria-hidden="true" />
       <div className="auth-scroll">
-        <div className={cx('auth-page', dir > 0 ? 'fwd' : 'back')} key={step}>
-          {step === 'username' && (
-            <form onSubmit={submitUsername} noValidate>
-              <div className="auth-logo"><Logo size={132} /></div>
-              <h1 className="auth-title">ورود به GuardNet</h1>
-              <p className="auth-sub">لطفاً نام کاربری حساب GuardNet خود را وارد کنید.</p>
-              <div className="auth-fields">
-                <Field label="نام کاربری" value={username} onChange={(v) => { setUsername(v.replace(/\s/g, '')); setError(''); }} dir="ltr" autoFocus
-                  error={error} autoComplete="username" name="username" maxLength={33} suffix={<span className="at">@</span>} />
-                <label className="auth-check" onClick={() => setRemember(!remember)}>
-                  <Check checked={remember} /><span>مرا به خاطر بسپار</span>
-                </label>
-              </div>
-              <Button type="submit" full loading={busy} className={cx('auth-next', USER_RE.test(username.replace(/^@/, '')) && 'ready')}>بعدی</Button>
-              <button type="button" className="auth-link" onClick={() => go('qr')}><Icon name="qr" />ورود با کد QR</button>
-              <div className="auth-foot">
-                حساب کاربری ندارید؟ کافی است نام کاربری دلخواه را وارد کنید تا
-                <button type="button" className="auth-inline" onClick={() => { if (USER_RE.test(username)) submitUsername(); else setError('ابتدا نام کاربری دلخواه را وارد کنید'); }}>حساب جدید بسازید</button>
-              </div>
-            </form>
-          )}
+        {showTwoPanel ? (
+          <div className="auth-container">
+            {/* Left panel: form */}
+            <div className="auth-form-panel">
+              <form onSubmit={submitUsername} noValidate className="auth-page">
+                <div className="auth-logo"><Logo size={120} /></div>
+                <h1 className="auth-title">ورود به GuardNet</h1>
+                <p className="auth-sub">لطفاً نام کاربری حساب GuardNet خود را وارد کنید.</p>
+                <div className="auth-fields">
+                  <Field label="نام کاربری" value={username} onChange={(v) => { setUsername(v.replace(/\s/g, '')); setError(''); }} dir="ltr" autoFocus
+                    error={error} autoComplete="username" name="username" maxLength={33} suffix={<span className="at">@</span>} />
+                  <label className="auth-check" onClick={() => setRemember(!remember)}>
+                    <Check checked={remember} /><span>مرا به خاطر بسپار</span>
+                  </label>
+                </div>
+                <Button type="submit" full loading={busy} className={cx('auth-next', USER_RE.test(username.replace(/^@/, '')) && 'ready')}>بعدی</Button>
+                <div className="auth-foot">
+                  حساب کاربری ندارید؟ کافی است نام کاربری دلخواه را وارد کنید تا
+                  <button type="button" className="auth-inline" onClick={() => { if (USER_RE.test(username)) submitUsername(); else setError('ابتدا نام کاربری دلخواه را وارد کنید'); }}>حساب جدید بسازید</button>
+                </div>
+              </form>
+            </div>
+            {/* Right panel: QR code (Telegram desktop style) */}
+            <div className="auth-qr-panel">
+              <QrLoginInline remember={remember} />
+            </div>
+          </div>
+        ) : (
+          <div className={cx('auth-page', dir > 0 ? 'fwd' : 'back')} key={step}>
+            {step === 'password' && (
+              <form onSubmit={submitPassword} noValidate>
+                <div className="auth-monkey"><Monkey mode={monkeyMode} /></div>
+                <h1 className="auth-title">رمز عبور را وارد کنید</h1>
+                <p className="auth-sub">حساب <b dir="ltr">@{username}</b> با رمز عبور محافظت می‌شود.</p>
+                <UserChip username={username} onEdit={() => { setPassword(''); go('username', -1); }} />
+                <div className="auth-fields">
+                  <Field label="رمز عبور" type={show ? 'text' : 'password'} value={password} onChange={(v) => { setPassword(v); setError(''); }}
+                    error={error} autoFocus autoComplete="current-password" dir="ltr" name="password"
+                    suffix={<EyeBtn show={show} onClick={() => setShow(!show)} />} onKeyDown={() => setFocus(true)} />
+                </div>
+                <Button type="submit" full loading={busy} className={cx('auth-next', password && 'ready')}>بعدی</Button>
+              </form>
+            )}
 
-          {step === 'password' && (
-            <form onSubmit={submitPassword} noValidate>
-              <div className="auth-monkey"><Monkey mode={monkeyMode} /></div>
-              <h1 className="auth-title">رمز عبور را وارد کنید</h1>
-              <p className="auth-sub">حساب <b dir="ltr">@{username}</b> با رمز عبور محافظت می‌شود.</p>
-              <UserChip username={username} onEdit={() => { setPassword(''); go('username', -1); }} />
-              <div className="auth-fields">
-                <Field label="رمز عبور" type={show ? 'text' : 'password'} value={password} onChange={(v) => { setPassword(v); setError(''); }}
-                  error={error} autoFocus autoComplete="current-password" dir="ltr" name="password"
-                  suffix={<EyeBtn show={show} onClick={() => setShow(!show)} />} onKeyDown={() => setFocus(true)} />
-              </div>
-              <Button type="submit" full loading={busy} className={cx('auth-next', password && 'ready')}>بعدی</Button>
-            </form>
-          )}
+            {step === 'code' && (
+              <form onSubmit={submitCode} noValidate>
+                <div className="auth-monkey"><Monkey mode={monkeyMode} progress={progress} /></div>
+                <h1 className="auth-title">تأیید دو مرحله‌ای</h1>
+                <p className="auth-sub">کد ۶ رقمی برنامه احراز هویت (مانند Google Authenticator) را وارد کنید.</p>
+                <UserChip username={username} onEdit={() => { setPassword(''); setCode(''); go('username', -1); }} />
+                <div className="auth-fields" onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}>
+                  <Field label="کد تأیید" value={code} inputMode="numeric" autoComplete="one-time-code" dir="ltr" autoFocus error={error} maxLength={6}
+                    onChange={(v) => { const c = v.replace(/[^\d۰-۹]/g, '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).slice(0, 6); setCode(c); setError(''); if (c.length === 6) submitCode(null, c); }} />
+                </div>
+                <Button type="submit" full loading={busy} className={cx('auth-next', code.length === 6 && 'ready')}>بعدی</Button>
+              </form>
+            )}
 
-          {step === 'code' && (
-            <form onSubmit={submitCode} noValidate>
-              <div className="auth-monkey"><Monkey mode={monkeyMode} progress={progress} /></div>
-              <h1 className="auth-title">تأیید دو مرحله‌ای</h1>
-              <p className="auth-sub">کد ۶ رقمی برنامه احراز هویت (مانند Google Authenticator) را وارد کنید.</p>
-              <UserChip username={username} onEdit={() => { setPassword(''); setCode(''); go('username', -1); }} />
-              <div className="auth-fields" onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}>
-                <Field label="کد تأیید" value={code} inputMode="numeric" autoComplete="one-time-code" dir="ltr" autoFocus error={error} maxLength={6}
-                  onChange={(v) => { const c = v.replace(/[^\d۰-۹]/g, '').replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).slice(0, 6); setCode(c); setError(''); if (c.length === 6) submitCode(null, c); }} />
-              </div>
-              <Button type="submit" full loading={busy} className={cx('auth-next', code.length === 6 && 'ready')}>بعدی</Button>
-            </form>
-          )}
+            {step === 'name' && (
+              <form onSubmit={submitName} noValidate>
+                <PhotoPicker photo={photo} setPhoto={setPhoto} />
+                <h1 className="auth-title">نام شما</h1>
+                <p className="auth-sub">نام خود را وارد کنید و یک عکس پروفایل بگذارید.</p>
+                <UserChip username={username} onEdit={() => go('username', -1)} isNew />
+                <div className="auth-fields">
+                  <Field label={error || 'نام (الزامی)'} value={first} onChange={(v) => { setFirst(v); setError(''); }} autoFocus maxLength={32} error={error} autoComplete="given-name" />
+                  <Field label="نام خانوادگی (اختیاری)" value={last} onChange={setLast} maxLength={32} autoComplete="family-name" />
+                </div>
+                <Button type="submit" full className={cx('auth-next', first.trim() && 'ready')}>بعدی</Button>
+              </form>
+            )}
 
-          {step === 'name' && (
-            <form onSubmit={submitName} noValidate>
-              <PhotoPicker photo={photo} setPhoto={setPhoto} />
-              <h1 className="auth-title">نام شما</h1>
-              <p className="auth-sub">نام خود را وارد کنید و یک عکس پروفایل بگذارید.</p>
-              <UserChip username={username} onEdit={() => go('username', -1)} isNew />
-              <div className="auth-fields">
-                <Field label={error || 'نام (الزامی)'} value={first} onChange={(v) => { setFirst(v); setError(''); }} autoFocus maxLength={32} error={error} autoComplete="given-name" />
-                <Field label="نام خانوادگی (اختیاری)" value={last} onChange={setLast} maxLength={32} autoComplete="family-name" />
-              </div>
-              <Button type="submit" full className={cx('auth-next', first.trim() && 'ready')}>بعدی</Button>
-            </form>
-          )}
+            {step === 'newpass' && (
+              <form onSubmit={submitRegister} noValidate>
+                <div className="auth-monkey"><Monkey mode={monkeyMode} /></div>
+                <h1 className="auth-title">یک رمز عبور بسازید</h1>
+                <p className="auth-sub">با این رمز وارد حساب <b dir="ltr">@{username}</b> می‌شوید. آن را جایی امن نگه دارید.</p>
+                <div className="auth-fields" onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}>
+                  <Field label="رمز عبور" type={show ? 'text' : 'password'} value={password} onChange={(v) => { setPassword(v); setError(''); }}
+                    autoFocus autoComplete="new-password" dir="ltr" error={error && !password2 ? error : ''} suffix={<EyeBtn show={show} onClick={() => setShow(!show)} />} />
+                  {password && (
+                    <div className={cx('pw-meter', `s${pwScore(password)}`)}>
+                      <div className="pw-bars">{[0, 1, 2, 3].map((i) => <span key={i} className={cx(i < pwScore(password) && 'on')} />)}</div>
+                      <span>{SCORE[pwScore(password)]}</span>
+                    </div>
+                  )}
+                  <Field label="تکرار رمز عبور" type={show ? 'text' : 'password'} value={password2} onChange={(v) => { setPassword2(v); setError(''); }}
+                    autoComplete="new-password" dir="ltr" error={error && password2 ? error : ''} />
+                </div>
+                <Button type="submit" full loading={busy} className={cx('auth-next', password && password2 && 'ready')}>شروع پیام‌رسانی</Button>
+                <button type="button" className="auth-link" onClick={() => go('name', -1)}><Icon name="arrowRight" />بازگشت</button>
+              </form>
+            )}
 
-          {step === 'newpass' && (
-            <form onSubmit={submitRegister} noValidate>
-              <div className="auth-monkey"><Monkey mode={monkeyMode} /></div>
-              <h1 className="auth-title">یک رمز عبور بسازید</h1>
-              <p className="auth-sub">با این رمز وارد حساب <b dir="ltr">@{username}</b> می‌شوید. آن را جایی امن نگه دارید.</p>
-              <div className="auth-fields" onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}>
-                <Field label="رمز عبور" type={show ? 'text' : 'password'} value={password} onChange={(v) => { setPassword(v); setError(''); }}
-                  autoFocus autoComplete="new-password" dir="ltr" error={error && !password2 ? error : ''} suffix={<EyeBtn show={show} onClick={() => setShow(!show)} />} />
-                {password && (
-                  <div className={cx('pw-meter', `s${pwScore(password)}`)}>
-                    <div className="pw-bars">{[0, 1, 2, 3].map((i) => <span key={i} className={cx(i < pwScore(password) && 'on')} />)}</div>
-                    <span>{SCORE[pwScore(password)]}</span>
-                  </div>
-                )}
-                <Field label="تکرار رمز عبور" type={show ? 'text' : 'password'} value={password2} onChange={(v) => { setPassword2(v); setError(''); }}
-                  autoComplete="new-password" dir="ltr" error={error && password2 ? error : ''} />
-              </div>
-              <Button type="submit" full loading={busy} className={cx('auth-next', password && password2 && 'ready')}>شروع پیام‌رسانی</Button>
-              <button type="button" className="auth-link" onClick={() => go('name', -1)}><Icon name="arrowRight" />بازگشت</button>
-            </form>
-          )}
-
-          {step === 'qr' && <QrLogin remember={remember} onBack={() => go('username', -1)} />}
-        </div>
+            {step === 'qr' && <QrLogin remember={remember} onBack={() => go('username', -1)} />}
+          </div>
+        )}
       </div>
       <div className="auth-brand"><Logo size={18} /> GuardNet · اتصال رمزنگاری‌شده</div>
     </div>
@@ -229,7 +240,61 @@ function PhotoPicker({ photo, setPhoto }) {
   );
 }
 
-/* ------------------------------------------------------------------ QR login */
+/* ------------------------------------------------------------------ QR login (inline panel for desktop two-panel layout) */
+function QrLoginInline({ remember }) {
+  const [qr, setQr] = useState(null);
+  const [err, setErr] = useState('');
+  const [state, setState] = useState('loading');
+  const alive = useRef(true);
+  const qrRef = useRef(null); qrRef.current = qr;
+
+  useEffect(() => {
+    alive.current = true;
+    let poll; let refresh;
+    const issue = async () => {
+      try {
+        const r = await api('/auth/qr', { method: 'POST', body: { remember } });
+        if (!alive.current) return;
+        setQr(r); setState('ready'); setErr('');
+        clearTimeout(refresh); refresh = setTimeout(issue, Math.max(10e3, r.expires_in - 8e3));
+      } catch (e) { if (alive.current) { setErr(e.message); setState('error'); clearTimeout(refresh); refresh = setTimeout(issue, 5000); } }
+    };
+    issue();
+    poll = setInterval(async () => {
+      const cur = qrRef.current; if (!cur) return;
+      try {
+        const r = await api(`/auth/qr/${encodeURIComponent(cur.token)}`);
+        if (!alive.current) return;
+        if (r.status === 'approved') { clearInterval(poll); clearTimeout(refresh); setState('approved'); await startSession(r.token, r.me); }
+      } catch { /* network hiccup */ }
+    }, 1500);
+    return () => { alive.current = false; clearInterval(poll); clearTimeout(refresh); };
+  }, [remember]);
+
+  const link = qr ? `${location.origin}${location.pathname}#qr/${qr.token}` : '';
+  return (
+    <>
+      <div className="qr-title">ورود سریع با QR</div>
+      <div className="qr-box">
+        {qr && state !== 'error' ? <QrSvg text={link} /> : <div className="qr-ph">{state === 'error' ? <Icon name="alert" /> : <Spinner size={36} />}</div>}
+        {state === 'approved' && <div className="qr-done"><Icon name="checkCircle" /></div>}
+      </div>
+      <div className="qr-sub">
+        GuardNet را روی دستگاهی که با آن وارد شده‌اید باز کنید، به
+        <b> تنظیمات › دستگاه‌ها › اتصال دستگاه </b>
+        بروید و دوربین را به سمت این کد بگیرید.
+      </div>
+      {qr && (
+        <div className="qr-sub" style={{ marginTop: '-8px' }}>
+          یا کد زیر را وارد کنید:
+          <div style={{ marginTop: 6 }}><span className="qr-code" dir="ltr">{qr.code || '····-····'}</span></div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ QR login (full page, mobile fallback) */
 function QrLogin({ remember, onBack }) {
   const [qr, setQr] = useState(null);
   const [err, setErr] = useState('');

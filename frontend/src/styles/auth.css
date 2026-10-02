@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Auth — modelled on Telegram's sign-in flow
+   Auth — Telegram-inspired sign-in with glassmorphism
    ========================================================================== */
 .auth {
   position: fixed; inset: 0;
@@ -8,26 +8,91 @@
   color: var(--text);
   overflow: hidden;
 }
+
+/* ---------- animated background ---------- */
 .auth-bg {
   position: absolute; inset: -20%;
   pointer-events: none;
   background:
-    radial-gradient(38% 32% at 18% 22%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
-    radial-gradient(34% 30% at 84% 78%, color-mix(in srgb, var(--accent-2) 12%, transparent), transparent 70%);
-  animation: auth-float 18s var(--ease) infinite alternate;
+    radial-gradient(42% 36% at 16% 20%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+    radial-gradient(38% 34% at 86% 80%, color-mix(in srgb, var(--accent-2) 16%, transparent), transparent 70%),
+    radial-gradient(30% 26% at 50% 50%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%);
+  animation: auth-float 22s var(--ease) infinite alternate;
 }
-@keyframes auth-float { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(3%, -2%, 0) scale(1.04); } }
+@keyframes auth-float {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(3%, -3%, 0) scale(1.06); }
+}
+
+/* ---------- scroll container ---------- */
 .auth-scroll {
   position: relative; flex: 1; min-height: 0;
   overflow-y: auto; overflow-x: hidden;
-  display: flex; justify-content: center;
-  padding: calc(clamp(24px, 9vh, 96px) + var(--safe-t)) 20px calc(40px + var(--safe-b));
+  display: flex; justify-content: center; align-items: center;
+  padding: calc(clamp(20px, 6vh, 64px) + var(--safe-t)) 20px calc(40px + var(--safe-b));
 }
+
+/* ---------- two-panel container (Telegram desktop layout) ---------- */
+.auth-container {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  max-width: 880px;
+  min-height: min(560px, 80vh);
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--glass-pane);
+  border: 1px solid var(--glass-stroke);
+  box-shadow:
+    inset 0 1px 0 var(--glass-glint),
+    0 1px 2px rgba(0, 0, 0, .04),
+    0 8px 24px rgba(0, 0, 0, .12),
+    0 32px 80px rgba(0, 0, 0, .2);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  backdrop-filter: blur(32px) saturate(1.8);
+  animation: auth-card-in 600ms var(--ease-out);
+}
+@keyframes auth-card-in {
+  from { opacity: 0; transform: translateY(16px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- left panel: form ---------- */
+.auth-form-panel {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex; flex-direction: column;
+  padding: clamp(28px, 5vw, 48px) clamp(24px, 4vw, 44px);
+}
+
+/* ---------- right panel: QR (Telegram desktop) ---------- */
+.auth-qr-panel {
+  flex: 0 0 360px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 20px;
+  padding: clamp(28px, 4vw, 40px) 32px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-inline-start: 1px solid var(--glass-stroke);
+  text-align: center;
+}
+.auth-qr-panel .qr-title {
+  font-size: 20px; font-weight: 700;
+  letter-spacing: -.2px;
+}
+.auth-qr-panel .qr-sub {
+  color: var(--text-2);
+  font-size: 14px; line-height: 1.7;
+  max-width: 280px;
+}
+
+/* ---------- single-panel (mobile / non-username steps) ---------- */
 .auth-page {
-  width: 100%; max-width: 360px;
+  width: 100%; max-width: 380px;
   display: flex; flex-direction: column; align-items: center;
   text-align: center;
   margin-block: auto;
+  min-height: 0;
 }
 .auth-page > form, .auth-page > .qr-page { width: 100%; display: flex; flex-direction: column; align-items: center; }
 .auth-page.fwd { animation: auth-in-fwd var(--t-slow) var(--ease-out); }
@@ -35,54 +100,92 @@
 @keyframes auth-in-fwd { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
 @keyframes auth-in-back { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 
-.auth-logo { width: 160px; height: 160px; display: grid; place-items: center; margin-bottom: 8px; }
-.auth-logo svg { width: 132px; height: 132px; filter: drop-shadow(0 12px 30px color-mix(in srgb, var(--accent) 35%, transparent)); animation: pop var(--t-slow) var(--ease-out); }
-.auth-monkey { width: 160px; height: 160px; margin-bottom: 8px; }
+/* ---------- logo ---------- */
+.auth-logo {
+  width: 140px; height: 140px;
+  display: grid; place-items: center;
+  margin-bottom: 4px;
+}
+.auth-logo svg {
+  width: 120px; height: 120px;
+  filter: drop-shadow(0 16px 36px color-mix(in srgb, var(--accent) 40%, transparent));
+  animation: pop var(--t-slow) var(--ease-out);
+}
+.auth-monkey { width: 140px; height: 140px; margin-bottom: 4px; }
+
+/* ---------- titles ---------- */
 .auth-title {
-  font-size: 30px; font-weight: 700; line-height: 1.25;
-  margin: 18px 0 10px;
+  font-size: 28px; font-weight: 700; line-height: 1.25;
+  margin: 16px 0 8px;
   letter-spacing: -.2px;
   overflow-wrap: anywhere;
 }
 .auth-sub {
   color: var(--text-2);
-  font-size: 15px; line-height: 1.6;
-  max-width: 320px;
-  margin-bottom: 28px;
+  font-size: 14.5px; line-height: 1.65;
+  max-width: 340px;
+  margin-bottom: 24px;
 }
 .auth-sub b { color: var(--text); font-weight: 600; }
+
+/* ---------- form fields ---------- */
 .auth-fields { width: 100%; text-align: start; }
 .auth-fields .field:last-child { margin-bottom: 8px; }
+
+/* ---------- keep me signed in (Telegram checkbox) ---------- */
 .auth-check {
-  display: flex; align-items: center; gap: 14px;
-  padding: 10px 6px; margin: -4px 0 8px;
-  border-radius: 10px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 4px; margin: -2px 0 6px;
   cursor: pointer; user-select: none;
-  font-size: 15px;
+  font-size: 14.5px;
+  color: var(--text-2);
+  transition: color var(--t-fast);
 }
-.auth-check:hover { background: var(--hover); }
+.auth-check:hover { color: var(--text); }
+.auth-check .check { width: 20px; height: 20px; }
+
+/* ---------- next button (Telegram blue) ---------- */
 .auth-next {
-  margin-top: 18px;
-  height: 54px; border-radius: 12px;
-  font-size: 16px; font-weight: 600;
-  opacity: .92;
+  margin-top: 16px;
+  height: 52px; border-radius: 12px;
+  font-size: 15.5px; font-weight: 600;
+  letter-spacing: .2px;
+  opacity: .5;
+  transition: opacity var(--t-fast), transform var(--t-fast), box-shadow var(--t-fast);
 }
-.auth-next.ready { opacity: 1; }
+.auth-next.ready {
+  opacity: 1;
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 36%, transparent);
+}
+.auth-next.ready:hover {
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--accent) 45%, transparent);
+  transform: translateY(-1px);
+}
+.auth-next:active { transform: scale(.98) !important; }
+
+/* ---------- secondary links ---------- */
 .auth-link {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 48px; padding: 0 16px; margin-top: 12px;
+  min-height: 44px; padding: 0 16px; margin-top: 10px;
   border-radius: 12px;
-  color: var(--accent); font-weight: 600; font-size: 15px;
+  color: var(--accent); font-weight: 600; font-size: 14.5px;
   transition: background var(--t-fast);
 }
 .auth-link .ic { width: 20px; height: 20px; }
 .auth-link:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .auth-link.danger { color: var(--danger); }
 .auth-link.danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
-.auth-foot { margin-top: 22px; color: var(--text-2); font-size: 13px; line-height: 1.8; max-width: 320px; }
+
+/* ---------- footer text ---------- */
+.auth-foot {
+  margin-top: 20px; color: var(--text-3); font-size: 13px;
+  line-height: 1.8; max-width: 340px;
+}
 .auth-inline { color: var(--accent); font-weight: 600; margin-inline-start: 4px; font-size: 13px; }
 .auth-inline:hover { text-decoration: underline; }
 .auth-err { color: var(--danger); font-size: 14px; margin: -4px 0 14px; }
+
+/* ---------- brand footer ---------- */
 .auth-brand {
   position: relative;
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -90,14 +193,15 @@
   color: var(--text-3); font-size: 12px;
 }
 
+/* ---------- user chip (username display) ---------- */
 .user-chip {
   display: inline-flex; align-items: center; gap: 8px;
   max-width: 100%;
   height: 36px; padding: 0 14px;
-  margin: -12px 0 24px;
+  margin: -8px 0 20px;
   border-radius: 18px;
   background: var(--hover);
-  color: var(--text); font-weight: 600; font-size: 15px;
+  color: var(--text); font-weight: 600; font-size: 14.5px;
   transition: background var(--t-fast);
 }
 .user-chip span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -105,14 +209,14 @@
 .user-chip:hover { background: var(--active); }
 .chip-new { font-size: 11px; padding: 1px 7px; border-radius: 8px; background: var(--accent); color: #fff; }
 
-/* photo picker (sign up) */
+/* ---------- photo picker ---------- */
 .auth-photo { margin-bottom: 4px; }
 .photo-circle {
-  position: relative; width: 120px; height: 120px; border-radius: 50%;
+  position: relative; width: 116px; height: 116px; border-radius: 50%;
   overflow: hidden;
   background: var(--accent);
   display: grid; place-items: center;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 12px 36px color-mix(in srgb, var(--accent) 40%, transparent);
   transition: transform var(--t) var(--ease);
 }
 .photo-circle.sm { width: 100px; height: 100px; }
@@ -123,7 +227,7 @@
 .photo-circle:hover .photo-ov { opacity: 1; background: rgba(0, 0, 0, .35); }
 .photo-ov .ic { width: 44px; height: 44px; stroke-width: 1.6; }
 
-/* password meter */
+/* ---------- password meter ---------- */
 .pw-meter { display: flex; align-items: center; gap: 10px; margin: -8px 4px 16px; font-size: 12px; color: var(--text-2); }
 .pw-bars { display: flex; gap: 4px; flex: 1; }
 .pw-bars span { flex: 1; height: 4px; border-radius: 2px; background: var(--line-2); transition: background var(--t); }
@@ -132,8 +236,8 @@
 .pw-meter.s3 .on { background: #84cc16; }
 .pw-meter.s4 .on { background: #22c55e; }
 
-/* monkey */
-.monkey { width: 160px; height: 160px; overflow: visible; }
+/* ---------- monkey ---------- */
+.monkey { width: 140px; height: 140px; overflow: visible; }
 .monkey .mk-bg { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
 .monkey .mk-eyes, .monkey .mk-headgrp { transition: transform 260ms var(--ease-out); transform-box: view-box; transform-origin: 80px 80px; }
 .monkey .mk-eye { transition: transform 90ms ease; }
@@ -142,27 +246,28 @@
 .monkey.m-idle .mk-headgrp { animation: mk-idle 4s var(--ease) infinite; }
 @keyframes mk-idle { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-2deg) translateY(1px); } }
 
-/* QR */
+/* ---------- QR code (Telegram-style) ---------- */
 .qr-page { width: 100%; }
 .qr-box {
   position: relative;
-  width: 264px; height: 264px; max-width: 100%;
-  padding: 14px;
-  border-radius: 24px;
+  width: 248px; height: 248px; max-width: 100%;
+  padding: 12px;
+  border-radius: 20px;
   background: #fff;
   color: #1f2937;
-  box-shadow: 0 16px 44px rgba(0, 0, 0, .18);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .18), 0 4px 12px rgba(0, 0, 0, .08);
   display: grid; place-items: center;
   animation: pop var(--t-slow) var(--ease-out);
 }
+.auth-qr-panel .qr-box { width: 220px; height: 220px; }
 .qr-svg { width: 100%; height: 100%; }
 .qr-logo-bg { fill: var(--accent); }
 .qr-ph { color: #6b7280; display: grid; place-items: center; }
 .qr-ph .ic { width: 40px; height: 40px; }
-.qr-done { position: absolute; inset: 0; border-radius: 24px; background: rgba(255, 255, 255, .92); display: grid; place-items: center; color: var(--ok); animation: fade-in var(--t); }
+.qr-done { position: absolute; inset: 0; border-radius: 20px; background: rgba(255, 255, 255, .92); display: grid; place-items: center; color: var(--ok); animation: fade-in var(--t); }
 .qr-done .ic { width: 72px; height: 72px; }
 .qr-steps { list-style: none; width: 100%; text-align: start; margin: 4px 0 8px; }
-.qr-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 8px 0; font-size: 15px; line-height: 1.6; }
+.qr-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 8px 0; font-size: 14px; line-height: 1.6; }
 .qr-steps li > span {
   flex: none; width: 26px; height: 26px; border-radius: 50%;
   background: var(--accent); color: #fff;
@@ -172,18 +277,48 @@
 .qr-steps li > div { min-width: 0; overflow-wrap: anywhere; }
 .qr-code { display: inline-block; padding: 1px 8px; border-radius: 7px; background: var(--hover); font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; letter-spacing: 1px; font-weight: 700; }
 
-@media (max-width: 480px) {
-  .auth-scroll { padding-top: calc(28px + var(--safe-t)); padding-inline: 18px; }
-  .auth-logo, .auth-monkey { width: 128px; height: 128px; }
-  .auth-logo svg { width: 112px; height: 112px; }
-  .monkey { width: 128px; height: 128px; }
-  .auth-title { font-size: 25px; margin-top: 12px; }
-  .auth-sub { font-size: 14px; margin-bottom: 24px; }
-  .qr-box { width: 236px; height: 236px; }
+/* ---------- divider between form and QR (desktop) ---------- */
+.auth-divider {
+  flex: 0 0 1px;
+  background: var(--glass-stroke);
+  margin: 32px 0;
 }
-@media (max-height: 640px) and (min-width: 481px) {
-  .auth-scroll { padding-top: 24px; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 768px) {
+  .auth-container {
+    flex-direction: column;
+    max-width: 400px;
+    min-height: auto;
+  }
+  .auth-form-panel { padding: 28px 24px; }
+  .auth-qr-panel {
+    flex: 0 0 auto;
+    border-inline-start: 0;
+    border-top: 1px solid var(--glass-stroke);
+    padding: 28px 24px;
+  }
+  .auth-qr-panel .qr-box { width: 200px; height: 200px; }
+  .auth-qr-panel .qr-title { font-size: 18px; }
+  .auth-qr-panel .qr-sub { font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+  .auth-scroll { padding-top: calc(24px + var(--safe-t)); padding-inline: 16px; }
+  .auth-container { border-radius: 24px; }
+  .auth-form-panel { padding: 24px 20px; }
+  .auth-qr-panel { display: none; }
   .auth-logo, .auth-monkey { width: 120px; height: 120px; }
-  .auth-logo svg { width: 104px; height: 104px; }
+  .auth-logo svg { width: 108px; height: 108px; }
   .monkey { width: 120px; height: 120px; }
+  .auth-title { font-size: 24px; margin-top: 10px; }
+  .auth-sub { font-size: 14px; margin-bottom: 20px; }
+  .qr-box { width: 220px; height: 220px; }
+}
+
+@media (max-height: 640px) and (min-width: 481px) {
+  .auth-scroll { padding-top: 20px; }
+  .auth-logo, .auth-monkey { width: 112px; height: 112px; }
+  .auth-logo svg { width: 100px; height: 100px; }
+  .monkey { width: 112px; height: 112px; }
 }
