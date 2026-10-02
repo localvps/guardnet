@@ -398,10 +398,6 @@ const THEMES = [
   { id: 'system', name: 'سیستم', bg: 'linear-gradient(90deg,#0e1621 50%,#dfe7d5 50%)', bub: '#5eb5f7', side: '#17212b' },
   { id: 'aurora', name: 'شفق', bg: 'linear-gradient(135deg,#1b1340,#0d2a4a)', bub: '#6d4bd8', side: '#1a1535', premium: true },
   { id: 'gold', name: 'طلایی', bg: 'linear-gradient(135deg,#1d1608,#2a1f0a)', bub: '#9a7424', side: '#1f190d', premium: true },
-  { id: 'crystal', name: 'کریستال', bg: 'linear-gradient(135deg,#0a1622,#1a2e4a)', bub: '#3b82f6', side: '#0f1a2e', premium: true },
-  { id: 'neon', name: 'نئون', bg: 'linear-gradient(135deg,#0a0a0a,#1a0033)', bub: '#e84393', side: '#111118', premium: true },
-  { id: 'cyber', name: 'سایبر', bg: 'linear-gradient(135deg,#0d1117,#161b22)', bub: '#58a6ff', side: '#0d1117', premium: true },
-  { id: 'ocean', name: 'اقیانوس', bg: 'linear-gradient(135deg,#001f3f,#003d5c)', bub: '#0ea5e9', side: '#002644', premium: true },
 ];
 const ACCENTS = ['#3390ec', '#8774e1', '#e17076', '#40a7a0', '#eea95b', '#e36cb0', '#54b848', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', '#06b6d4'];
 const WALLS = [['gradient', 'گرادیان'], ['aurora', 'شفق'], ['ocean', 'اقیانوس'], ['sunset', 'غروب'], ['pattern', 'الگو'], ['plain', 'ساده'], ['mesh', 'مش'], ['dots', 'نقطه‌ها']];

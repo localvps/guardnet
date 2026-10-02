@@ -63,12 +63,14 @@ export const DEFAULT_SETTINGS = {
 };
 export const settings = () => ({ ...DEFAULT_SETTINGS, ...(getState().me?.settings || {}) });
 
+export const KNOWN_THEMES = ['dark', 'light', 'midnight', 'system', 'aurora', 'gold'];
+const PREMIUM_THEMES = ['aurora', 'gold'];
 const ACCENTS_2 = { '#3390ec': '#5eb5f7', '#8774e1': '#b39bff', '#e17076': '#ff9f9f', '#40a7a0': '#6fd6c8', '#eea95b': '#ffd08a', '#e36cb0': '#ff9bd2', '#54b848': '#8ee57f' };
 export function applySettings(s = settings()) {
   const root = document.documentElement;
-  const premiumTheme = ['aurora', 'gold', 'crystal', 'neon', 'cyber', 'ocean'].includes(s.theme) && !getState().me?.premium;
-  const theme = premiumTheme ? 'dark' : s.theme === 'system'
-    ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : s.theme;
+  const known = KNOWN_THEMES.includes(s.theme) ? s.theme : 'dark';
+  const theme = PREMIUM_THEMES.includes(known) && !getState().me?.premium ? 'dark' : known === 'system'
+    ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : known;
   root.dataset.theme = theme;
   root.style.setProperty('--accent', s.accent);
   root.style.setProperty('--accent-2', ACCENTS_2[s.accent] || s.accent);
