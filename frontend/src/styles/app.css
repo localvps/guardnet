@@ -310,13 +310,15 @@
 @media (max-width: 720px) {
   :root { --side-w: 100%; --av: 52px; }
   .sidebar { position: absolute; inset: 0; width: 100%; border: 0; z-index: 1; transition: transform var(--t-slow) var(--ease-out); }
-  .chat-area { position: absolute; inset: 0; z-index: 2; background: var(--bg); box-shadow: 0 0 24px rgba(0, 0, 0, .35); transform: translateX(-100%); transition: transform var(--t-slow) var(--ease-out); visibility: hidden; }
+  .chat-area { position: absolute; inset: 0; z-index: 2; background: var(--bg); box-shadow: 0 0 24px rgba(0, 0, 0, .35); transform: translateX(-100%); transition: transform var(--t-slow) var(--ease-out), visibility 0s linear var(--t-slow); visibility: hidden; }
   .messenger.has-chat .chat-area { transform: none; visibility: visible; }
   .messenger.has-chat .sidebar { transform: translateX(28%); pointer-events: none; }
   .messenger:not(.has-chat) .chat-area { transition: transform var(--t-slow) var(--ease-out), visibility 0s linear var(--t-slow); }
   .info-panel { width: 100%; animation-name: slide-in-l; }
   .no-chat { display: none; }
   .chat-list { padding-inline: 4px; }
+  .side-head { padding-inline: 4px; }
+  .side-search { padding: 4px 8px 8px; }
 }
 @media (min-width: 721px) {
   .back-btn { display: none !important; }
@@ -327,4 +329,17 @@
   .ci-title { font-size: 15px; }
   .ci-text { font-size: 14px; }
   .fab { width: 52px; height: 52px; inset-inline-end: 16px; bottom: calc(16px + var(--safe-b)); }
+  .side-head { gap: 4px; }
+  .side-title { font-size: 17px; }
+}
+@media (max-width: 320px) {
+  :root { --av: 44px; }
+  .chat-item { gap: 8px; padding: 6px 6px; min-height: 60px; }
+  .ci-title { font-size: 14.5px; }
+  .ci-text { font-size: 13.5px; }
+  .ci-time { font-size: 11.5px; }
+  .ci-badge { min-width: 20px; height: 20px; font-size: 11.5px; }
+  .side-title { font-size: 16px; }
+  .fab { width: 48px; height: 48px; inset-inline-end: 12px; }
+  .fab .ic { width: 24px; height: 24px; }
 }

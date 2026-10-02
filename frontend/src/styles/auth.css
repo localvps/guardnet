@@ -314,6 +314,19 @@
   .auth-title { font-size: 24px; margin-top: 10px; }
   .auth-sub { font-size: 14px; margin-bottom: 20px; }
   .qr-box { width: 220px; height: 220px; }
+  .auth-divider { display: none; }
+}
+@media (max-width: 360px) {
+  .auth-scroll { padding-inline: 12px; }
+  .auth-container { border-radius: 20px; }
+  .auth-form-panel { padding: 20px 16px; }
+  .auth-logo, .auth-monkey { width: 104px; height: 104px; }
+  .auth-logo svg { width: 96px; height: 96px; }
+  .monkey { width: 104px; height: 104px; }
+  .auth-title { font-size: 22px; }
+  .auth-sub { font-size: 13.5px; }
+  .auth-next { height: 48px; font-size: 14.5px; }
+  .qr-box { width: 200px; height: 200px; }
 }
 
 @media (max-height: 640px) and (min-width: 481px) {

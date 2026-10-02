@@ -707,6 +707,8 @@
 @media (max-width: 720px) {
   .chat-head { padding-inline: 4px 6px; }
   .ch-info { gap: 10px; padding: 0 4px; }
+  .ch-title { font-size: 15px; }
+  .ch-status { font-size: 13px; }
   .msg-list { padding: 10px 10px 8px; }
   .unread-sep { margin-inline: -10px; }
   .msg.selected::before { inset-inline: -10px; }
@@ -720,11 +722,34 @@
   .mention-list { inset-inline: 8px; max-width: none; }
   .down-fab { inset-inline-end: 12px; bottom: 10px; }
   .hide-xs { display: none !important; }
+  .ch-actions { gap: 0; }
+  .ch-actions .icon-btn { width: 38px; height: 38px; }
+  .ch-actions .icon-btn .ic { width: 20px; height: 20px; }
 }
 @media (max-width: 380px) {
   .bubble { max-width: 88%; }
   .b-sticker { font-size: 92px; }
   .emoji-1 .b-emoji { font-size: 64px; }
+  .chat-head { padding-inline: 2px 4px; }
+  .ch-info { gap: 8px; }
+  .ch-title { font-size: 14.5px; }
+  .ch-status { font-size: 12.5px; }
+  .composer-wrap { padding: 4px 6px calc(6px + var(--safe-b)); }
+  .composer { min-height: 46px; }
+  .compose-input { min-height: 46px; }
+  .send-btn { width: 46px; height: 46px; }
+  .send-btn .ic { width: 22px; height: 22px; }
+  .msg-list { padding: 8px 8px 6px; }
+}
+@media (max-width: 320px) {
+  .bubble { max-width: 90%; }
+  .b-sticker { font-size: 80px; }
+  .b-emoji { font-size: 38px; }
+  .emoji-1 .b-emoji { font-size: 56px; }
+  .ch-actions .icon-btn { width: 34px; height: 34px; }
+  .ch-actions .icon-btn .ic { width: 18px; height: 18px; }
+  .composer .icon-btn { width: 36px; height: 36px; }
+  .composer .icon-btn .ic { width: 20px; height: 20px; }
 }
 @media (hover: none) {
   .hide-touch { display: none !important; }

@@ -482,13 +482,22 @@ video.vw-media { cursor: default; background: #000; }
   .vw-nav.right { right: 8px; }
   .vw-count { display: none; }
   .call-local { top: calc(64px + var(--safe-t)); width: 104px; }
-}
-@media (max-width: 380px) {
-  .theme-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-inline: 10px; }
-  .wall-grid { gap: 8px; padding-inline: 10px; }
-  .ph-actions button { font-size: 12px; }
-  .call-btn { width: 56px; height: 56px; }
-  .call-btn-wrap { width: 64px; }
+  .call-controls { gap: clamp(10px, 4vw, 20px); }
+  .call-btn-wrap { width: 66px; }
+  .call-btn { width: 58px; height: 58px; }
+  .call-btn .ic { width: 25px; height: 25px; }
+  .call-btn-wrap span { font-size: 12px; }
+  .call-name { font-size: clamp(20px, 5vw, 26px); }
+  .profile-hero { padding: 18px 12px 14px; }
+  .ph-name { font-size: 18px; }
+  .ph-actions { gap: 6px; }
+  .ph-actions button { font-size: 12px; padding: 8px 2px 6px; }
+  .ph-actions button .ic { width: 18px; height: 18px; }
+  .info-card { margin-inline: 8px; }
+  .row { padding-inline: 12px; gap: 12px; }
+  .row-title { font-size: 14.5px; }
+  .row-sub { font-size: 12.5px; }
+  .row-value { max-width: 40%; font-size: 13px; }
 }
 @media (max-width: 440px) {
   .call-controls { gap: 10px; padding-inline: 10px; flex-wrap: nowrap; }
@@ -496,4 +505,43 @@ video.vw-media { cursor: default; background: #000; }
   .call-btn { width: 58px; height: 58px; }
   .call-btn .ic { width: 25px; height: 25px; }
   .call-btn-wrap span { font-size: 12px; }
+}
+@media (max-width: 380px) {
+  .theme-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-inline: 10px; }
+  .wall-grid { gap: 8px; padding-inline: 10px; }
+  .ph-actions button { font-size: 12px; }
+  .call-btn { width: 56px; height: 56px; }
+  .call-btn-wrap { width: 64px; }
+  .call-controls { gap: 8px; padding-inline: 8px; }
+  .call-btn .ic { width: 23px; height: 23px; }
+  .call-btn-wrap span { font-size: 11.5px; }
+  .call-name { font-size: 20px; }
+  .profile-hero { padding: 14px 10px 12px; }
+  .ph-name { font-size: 17px; }
+  .info-card { margin-inline: 6px; }
+  .row { padding-inline: 10px; gap: 10px; }
+  .row-title { font-size: 14px; }
+  .row-sub { font-size: 12px; }
+  .row-value { max-width: 35%; font-size: 12.5px; }
+  .modal-layer { padding: calc(8px + var(--safe-t)) 8px calc(8px + var(--safe-b)); }
+  .modal { border-radius: 16px; }
+  .modal-body { padding-inline: 12px; }
+  .modal-body > .row { margin-inline: -12px; padding-inline: 12px; }
+  .modal-head { padding-inline: 8px 12px; }
+  .modal-foot { padding: 8px 12px 12px; }
+}
+@media (max-width: 320px) {
+  .call-btn { width: 50px; height: 50px; }
+  .call-btn .ic { width: 21px; height: 21px; }
+  .call-btn-wrap { width: 56px; }
+  .call-btn-wrap span { font-size: 11px; }
+  .call-controls { gap: 6px; }
+  .profile-hero { padding: 12px 8px 10px; }
+  .ph-name { font-size: 16px; }
+  .info-card { margin-inline: 4px; }
+  .row { padding-inline: 8px; gap: 8px; }
+  .row-title { font-size: 13.5px; }
+  .row-sub { font-size: 11.5px; }
+  .row-value { max-width: 32%; font-size: 12px; }
+  .theme-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
