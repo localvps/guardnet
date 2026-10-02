@@ -176,19 +176,41 @@ calls.delete('/', h((req) => {
   return { ok: true };
 }));
 
+// Ephemeral TURN credentials: coturn time-based secret auth.
+// The long-term WEBRTC_TURN_SECRET never leaves the server; clients only get
+// short-lived HMAC credentials (username = "expiry:user", credential = HMAC-SHA1 base64).
+function turnEphemeral() {
+  // Prefer a file path over an inline env var so the shared secret never has
+  // to live in the repo / process table.
+  let secret = process.env.WEBRTC_TURN_SECRET || '';
+  if (!secret && process.env.WEBRTC_TURN_SECRET_FILE) {
+    try { secret = fs.readFileSync(process.env.WEBRTC_TURN_SECRET_FILE, 'utf8').trim(); } catch { /* */ }
+  }
+  if (!secret) return null;
+  const user = process.env.WEBRTC_TURN_USER || 'guardnet';
+  const ttl = Math.min(Math.max(parseInt(process.env.WEBRTC_TURN_TTL || '86400', 10) || 86400, 300), 604800);
+  const username = `${Math.floor(Date.now() / 1000) + ttl}:${user}`;
+  const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
+  return { username, credential };
+}
+
 // ICE/TURN configuration for WebRTC calls
 calls.get('/ice', h((req) => {
   auth(req); // require auth
-  const stunUrls = process.env.WEBRTC_STUN_URLS || 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302';
+  const stunUrls = process.env.WEBRTC_STUN_URLS || 'stun:stun.cloudflare.com:3478,stun:stun.l.google.com:19302';
   const turnUrls = process.env.WEBRTC_TURN_URLS || '';
   const turnUser = process.env.WEBRTC_TURN_USER || '';
   const turnPass = process.env.WEBRTC_TURN_PASS || '';
   const forceTurn = process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
 
+  const split = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
   const iceServers = [];
-  if (stunUrls) iceServers.push({ urls: stunUrls.split(',').map((s) => s.trim()).filter(Boolean) });
-  if (turnUrls && turnUser && turnPass) {
-    iceServers.push({ urls: turnUrls.split(',').map((s) => s.trim()).filter(Boolean), username: turnUser, credential: turnPass });
+  if (stunUrls) iceServers.push({ urls: split(stunUrls) });
+  const ephemeral = turnEphemeral();
+  if (turnUrls && (ephemeral || (turnUser && turnPass))) {
+    const creds = ephemeral || { username: turnUser, credential: turnPass };
+    // Separate entry per URL keeps a dead transport from poisoning the whole TURN entry.
+    iceServers.push(...split(turnUrls).map((url) => ({ urls: url, ...creds })));
   }
-  return { iceServers, iceTransportPolicy: forceTurn ? 'relay' : 'all' };
+  return { iceServers, iceTransportPolicy: forceTurn ? 'relay' : 'all', ttl: ephemeral ? parseInt(process.env.WEBRTC_TURN_TTL || '86400', 10) : 0 };
 }));

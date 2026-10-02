@@ -6,35 +6,47 @@ import { cx, fmtDur } from '../lib/format.jsx';
 import { Avatar, Icon } from './ui.jsx';
 import { api } from '../lib/api.js';
 
-// Default STUN; will be replaced with TURN config from backend if available
-let ICE_CONFIG = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
-let ICE_POLICY = 'all';
+// Self-hosted ICE only. The backend serves our own coturn (xxxxxx) as both
+// STUN and TURN, so calls keep working on a fully national network with no
+// Google/Cloudflare STUN and no third-party TURN. Hardcoded to our own relay
+// so a slow /calls/ice response can never downgrade a call to host candidates.
+let ICE_CONFIG = [
+  { urls: 'stun:YOUR_PUBLIC_IP:3478' },
+  { urls: ['turn:YOUR_PUBLIC_IP:3478?transport=udp', 'turn:YOUR_PUBLIC_IP:3478?transport=tcp', 'turns:YOUR_PUBLIC_IP:5349?transport=tcp'] },
+];
+let ICE_POLICY = 'relay';
+let ICE_TURN = true; // we always have our own relay
 
 async function loadIceConfig() {
   try {
     const r = await api('/calls/ice');
     if (r?.iceServers?.length) {
       ICE_CONFIG = r.iceServers;
-      ICE_POLICY = r.iceTransportPolicy || 'all';
+      ICE_POLICY = r.iceTransportPolicy || 'relay';
+      ICE_TURN = r.iceServers.some((s) => (Array.isArray(s.urls) ? s.urls : [s.urls]).some((u) => /turns?:/i.test(u)));
     }
-  } catch { /* fall back to STUN */ }
+  } catch { /* keep the built-in self-hosted relay */ }
 }
-loadIceConfig();
+const iceReady = loadIceConfig();
 
 // High-quality audio constraints
 const AUDIO_C = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
 // High-quality video constraints
 const VIDEO_C = { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 30, max: 30 }, facingMode: 'user' };
 
-// Set sender parameters for better quality
+// Tune the encoders for a relayed call: the server is the transport, so keep
+// audio resilient (Opus FEC/inband + comfortable packet time) and let video
+// hold its frame rate and trade resolution instead of dropping frames.
 async function tuneSenders(pc) {
   for (const s of pc.getSenders()) {
     if (s.track?.kind === 'video') {
       try {
         const p = s.getParameters();
         if (!p.encodings) p.encodings = [{}];
+        p.degradationPreference = 'maintain-framerate';
         p.encodings[0].maxBitrate = 2000000;
         p.encodings[0].maxFramerate = 30;
+        p.encodings[0].scaleResolutionDownBy = 1;
         await s.setParameters(p);
       } catch { /* */ }
     }
@@ -42,21 +54,61 @@ async function tuneSenders(pc) {
       try {
         const p = s.getParameters();
         if (!p.encodings) p.encodings = [{}];
-        p.encodings[0].maxBitrate = 64000;
+        p.encodings[0].maxBitrate = 96000;
         await s.setParameters(p);
       } catch { /* */ }
+      try {
+        const st = await s.getStats();
+        st.forEach((r) => {
+          if (r.type === 'rtp') {
+            const c = r.codec;
+            if (r.kind === 'audio' && c) {
+              c.useInbandFec = 1; c.maxAverageBitrate = 96000; c.maxPlayoutDelay = 120;
+              c.ptime = 20; c.useDtx = 0; c.stereo = 0; c.spropStereo = 0;
+              c.channelConfig = 1; c.feedbackEnabled = true;
+            }
+          }
+        });
+      } catch { /* older browsers ignore codec params */ }
     }
   }
 }
 
 // Runtime objects live outside React state
-const rt = { pc: null, local: null, remote: null, pendingIce: [], screen: null, reconnectTimer: null };
+const rt = {
+  pc: null, local: null, remote: null, pendingIce: [], screen: null,
+  reconnectTimer: null, watchTimer: null, gen: 0, relayTried: false, id: null,
+};
+
+// A call is stuck in "connecting" far too long. ICE can hang in `checking`
+// forever behind a stateful firewall, so we escalate instead of waiting.
+const STUCK_MS = 12000;
+function armWatchdog() {
+  if (rt.watchTimer) clearTimeout(rt.watchTimer);
+  rt.watchTimer = setTimeout(() => {
+    const pc = rt.pc;
+    if (!pc || !getState().call) return;
+    const st = pc.iceConnectionState;
+    if (st === 'connected' || st === 'completed') return;
+    if (!rt.relayTried && ICE_TURN) {
+      // Direct path is not working - rebuild forcing the TURN relay.
+      rt.relayTried = true;
+      renegotiate('relay');
+    } else {
+      try { pc.restartIce(); } catch { /* */ }
+    }
+    armWatchdog();
+  }, STUCK_MS);
+}
+function clearWatchdog() { if (rt.watchTimer) { clearTimeout(rt.watchTimer); rt.watchTimer = null; } }
 
 const patch = (p) => { const c = getState().call; if (c) setState({ call: { ...c, ...p } }); };
 
 export async function startCall(user, video) {
   if (getState().call) { toast('در حال حاضر یک تماس فعال دارید.', 'error'); return; }
   if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) { toast('مرورگر شما از تماس پشتیبانی نمی‌کند.', 'error'); return; }
+  await iceReady; // never dial without knowing the TURN servers
+  rt.relayTried = false; rt.pendingIce = [];
   setState({ call: { phase: 'requesting', peer: user, video, out: true, muted: false, cam: video, min: false } });
   try {
     rt.local = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_C, video: video ? VIDEO_C : false });
@@ -68,24 +120,29 @@ export async function startCall(user, video) {
   wsSend('call:start', { to: user.id, video });
 }
 
-function makePc(id) {
-  const pc = new RTCPeerConnection({ iceServers: ICE_CONFIG, iceTransportPolicy: ICE_POLICY });
-  rt.pc = pc; rt.pendingIce = [];
+function makePc(id, policy) {
+  rt.gen += 1;
+  const gen = rt.gen;
+  rt.pc?.close();
+  const pc = new RTCPeerConnection({ iceServers: ICE_CONFIG, iceTransportPolicy: policy || ICE_POLICY });
+  rt.pc = pc; rt.id = id;
   rt.remote = new MediaStream();
   rt.local?.getTracks().forEach((t) => pc.addTrack(t, rt.local));
   tuneSenders(pc);
   pc.ontrack = (e) => { e.streams[0]?.getTracks().forEach((t) => { if (!rt.remote.getTracks().includes(t)) rt.remote.addTrack(t); }); patch({ remoteTick: Date.now() }); };
-  pc.onicecandidate = (e) => { if (e.candidate) wsSend('call:ice', { call_id: id, cand: e.candidate.toJSON() }); };
+  pc.onicecandidate = (e) => { if (e.candidate) wsSend('call:ice', { call_id: id, gen, cand: e.candidate.toJSON() }); };
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
     if (s === 'connected') { const c = getState().call; if (c && c.phase !== 'active') { patch({ phase: 'active', since: Date.now() }); stopRing(); } }
-    else if (s === 'failed') { toast('اتصال تماس برقرار نشد (شبکه یا فایروال).', 'error'); hangup(); }
+    else if (s === 'failed') {
+      if (!rt.relayTried && ICE_TURN) { rt.relayTried = true; renegotiate('relay'); }
+      else { toast('اتصال تماس برقرار نشد (شبکه یا فایروال).', 'error'); hangup(); }
+    }
     else if (s === 'disconnected') {
       patch({ weak: true });
-      // Attempt ICE restart after 3s if still disconnected
       if (rt.reconnectTimer) clearTimeout(rt.reconnectTimer);
       rt.reconnectTimer = setTimeout(() => {
-        if (rt.pc && pc.connectionState === 'disconnected') {
+        if (rt.pc === pc && pc.connectionState === 'disconnected') {
           try { pc.restartIce(); } catch { /* */ }
         }
       }, 3000);
@@ -94,20 +151,27 @@ function makePc(id) {
     }
   };
   pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') patch({ weak: false });
-    else if (pc.iceConnectionState === 'failed') { toast('اتصال ICE ناموفق بود.', 'error'); hangup(); }
+    const st = pc.iceConnectionState;
+    if (st === 'connected' || st === 'completed') { patch({ weak: false }); clearWatchdog(); }
+    else if (st === 'failed') {
+      if (!rt.relayTried && ICE_TURN) { rt.relayTried = true; renegotiate('relay'); }
+      else { toast('اتصال ICE ناموفق بود.', 'error'); hangup(); }
+    } else armWatchdog();
   };
+  armWatchdog();
   return pc;
 }
-async function flushIce() { for (const c of rt.pendingIce.splice(0)) { try { await rt.pc.addIceCandidate(c); } catch { /* */ } } }
+async function flushIce() { for (const c of rt.pendingIce.splice(0)) { try { await rt.pc?.addIceCandidate(c); } catch { /* */ } } }
 
 function cleanup(status) {
   stopRing();
+  clearWatchdog();
   if (rt.reconnectTimer) { clearTimeout(rt.reconnectTimer); rt.reconnectTimer = null; }
   rt.pc?.close(); rt.pc = null;
   rt.local?.getTracks().forEach((t) => t.stop()); rt.local = null;
   rt.screen?.getTracks().forEach((t) => t.stop()); rt.screen = null;
   rt.remote = null; rt.pendingIce = [];
+  rt.gen = 0; rt.relayTried = false; rt.id = null;
   const c = getState().call;
   if (!c) return;
   if (status) {
@@ -130,6 +194,8 @@ async function accept() {
   try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_C, video: c.video ? VIDEO_C : false }); } catch {
     try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: true }); patch({ cam: false }); toast('دوربین در دسترس نیست؛ تماس صوتی برقرار می‌شود.'); } catch { toast('دسترسی به میکروفون داده نشد.', 'error'); wsSend('call:decline', { call_id: c.id }); cleanup(); return; }
   }
+  await iceReady; // need TURN before we start gathering
+  rt.relayTried = false; rt.pendingIce = [];
   makePc(c.id);
   wsSend('call:accept', { call_id: c.id });
 }
@@ -151,29 +217,48 @@ setCallEventHook(async (ev, d) => {
     case 'call:accepted': {
       if (!c || c.id !== d.call_id) return;
       stopRing(); patch({ phase: 'connecting' });
+      // The callee starts gathering ICE before this offer arrives, so drain
+      // whatever it already buffered before we send ours.
+      await flushIce();
       const pc = makePc(c.id);
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      wsSend('call:offer', { call_id: c.id, sdp: pc.localDescription.toJSON() });
+      wsSend('call:offer', { call_id: c.id, gen: rt.gen, sdp: pc.localDescription.toJSON() });
       break;
     }
     case 'call:offer': {
-      if (!c || c.id !== d.call_id || !rt.pc) return;
+      if (!c || c.id !== d.call_id) return;
+      if (d.gen !== undefined && d.gen !== rt.gen) {
+        // Caller rebuilt its peer connection (TURN relay fallback).
+        // Adopt the same generation, otherwise our ICE candidates will be stale.
+        const pc = makePc(c.id, d.policy);
+        await pc.setRemoteDescription(d.sdp);
+        const ans = await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        wsSend('call:answer', { call_id: c.id, gen: rt.gen, sdp: pc.localDescription.toJSON() });
+        break;
+      }
+      if (!rt.pc) return;
       await rt.pc.setRemoteDescription(d.sdp);
       await flushIce();
       const ans = await rt.pc.createAnswer();
       await rt.pc.setLocalDescription(ans);
-      wsSend('call:answer', { call_id: c.id, sdp: rt.pc.localDescription.toJSON() });
+      wsSend('call:answer', { call_id: c.id, gen: rt.gen, sdp: rt.pc.localDescription.toJSON() });
       break;
     }
     case 'call:answer':
       if (!c || c.id !== d.call_id || !rt.pc) return;
+      if (d.gen !== undefined && d.gen !== rt.gen) return; // stale answer
       await rt.pc.setRemoteDescription(d.sdp); await flushIce();
       break;
-    case 'call:ice':
-      if (!c || c.id !== d.call_id || !rt.pc) return;
-      if (rt.pc.remoteDescription) { try { await rt.pc.addIceCandidate(d.cand); } catch { /* */ } } else rt.pendingIce.push(d.cand);
+    case 'call:ice': {
+      if (!c || c.id !== d.call_id) return;
+      // ICE can legitimately arrive before we have built the peer connection;
+      // buffering here is what keeps symmetric-NAT pairs from failing.
+      if (!rt.pc || (d.gen !== undefined && d.gen !== rt.gen) || !rt.pc.remoteDescription) rt.pendingIce.push(d.cand);
+      else { try { await rt.pc.addIceCandidate(d.cand); } catch { /* */ } }
       break;
+    }
     case 'call:media': if (c?.id === d.call_id) patch({ peerMuted: !!d.muted, peerCam: d.cam !== false }); break;
     case 'call:end': if (c && c.id === d.call_id) cleanup(d.status); break;
     case 'call:error': toast(d.msg, 'error'); cleanup(); break;
@@ -201,10 +286,12 @@ async function toggleCam() {
   track.enabled = !c.cam; patch({ cam: !c.cam });
   if (c.id) wsSend('call:media', { call_id: c.id, muted: c.muted, cam: !c.cam });
 }
-async function renegotiate() {
-  const c = getState().call; if (!rt.pc || !c) return;
-  const o = await rt.pc.createOffer(); await rt.pc.setLocalDescription(o);
-  wsSend('call:offer', { call_id: c.id, sdp: rt.pc.localDescription.toJSON() });
+async function renegotiate(policy) {
+  const c = getState().call; if (!rt.local || !c?.id) return;
+  const pc = makePc(c.id, policy);
+  const o = await pc.createOffer();
+  await pc.setLocalDescription(o);
+  wsSend('call:offer', { call_id: c.id, gen: rt.gen, policy, sdp: pc.localDescription.toJSON() });
 }
 async function toggleScreen() {
   const c = getState().call; if (!c || !rt.pc) return;
