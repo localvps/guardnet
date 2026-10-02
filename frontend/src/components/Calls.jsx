@@ -88,9 +88,38 @@ async function tuneSenders(pc) {
   }
 }
 
+// Screen share runs on a very different profile from the camera: the encoder
+// must keep text readable instead of dropping resolution, and it only has to
+// push ~30fps of mostly-static frames, not a live 30fps camera.
+const SCREEN = { fps: { ideal: 30, max: 30 }, w: { max: 1920 }, h: { max: 1080 }, bitrate: 2500000 };
+async function applyVideoProfile(kind) {
+  const pc = rt.pc; if (!pc) return;
+  for (const s of pc.getSenders()) {
+    if (!s.track || s.track.kind !== 'video') continue;
+    try {
+      // Chrome rejects a partial dict ("Required member is undefined: codecs"),
+      // so the profile has to be written into the real parameters object.
+      const p = await s.getParameters();
+      if (!p.encodings || !p.encodings.length) p.encodings = [{}];
+      const e = p.encodings[0];
+      if (kind === 'screen') {
+        const h = s.track.getSettings?.().height || 1080;
+        e.maxBitrate = SCREEN.bitrate;
+        e.maxFramerate = 30;
+        e.scaleResolutionDownBy = Math.max(1, Math.min(2, h / 1080));
+        e.degradationPreference = 'maintain-resolution';
+      } else {
+        e.maxBitrate = 2000000; e.maxFramerate = 30; e.scaleResolutionDownBy = 1;
+        e.degradationPreference = 'maintain-framerate';
+      }
+      await s.setParameters(p);
+    } catch { /* unsupported */ }
+  }
+}
+
 // Runtime objects live outside React state
 const rt = {
-  pc: null, local: null, remote: null, pendingIce: [], screen: null,
+  pc: null, local: null, remote: null, pendingIce: [], screen: null, screenMic: null,
   reconnectTimer: null, watchTimer: null, gen: 0, relayTried: false, id: null,
 };
 
@@ -143,7 +172,17 @@ function makePc(id, policy) {
   rt.remote = new MediaStream();
   rt.local?.getTracks().forEach((t) => pc.addTrack(t, rt.local));
   tuneSenders(pc);
-  pc.ontrack = (e) => { e.streams[0]?.getTracks().forEach((t) => { if (!rt.remote.getTracks().includes(t)) rt.remote.addTrack(t); }); patch({ remoteTick: Date.now() }); };
+  pc.ontrack = (e) => {
+    const add = (t) => {
+      if (!t || !rt.remote || rt.remote.getTracks().includes(t)) return;
+      rt.remote.addTrack(t);
+      // A removed sender leaves an ended track inside the stream; prune it or the
+      // receiver keeps rendering the last frame of the screen forever.
+      t.onended = () => { if (rt.remote && rt.remote.getTracks().includes(t)) rt.remote.removeTrack(t); patch({ remoteTick: Date.now() }); };
+    };
+    if (e.streams[0]) e.streams[0].getTracks().forEach(add); else add(e.track);
+    patch({ remoteTick: Date.now() });
+  };
   pc.onicecandidate = (e) => { if (e.candidate) wsSend('call:ice', { call_id: id, gen, cand: e.candidate.toJSON() }); };
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
@@ -184,6 +223,7 @@ function cleanup(status) {
   rt.pc?.close(); rt.pc = null;
   rt.local?.getTracks().forEach((t) => t.stop()); rt.local = null;
   rt.screen?.getTracks().forEach((t) => t.stop()); rt.screen = null;
+  rt.screenMic = null;
   rt.remote = null; rt.pendingIce = [];
   rt.gen = 0; rt.relayTried = false; rt.id = null;
   const c = getState().call;
@@ -273,7 +313,7 @@ setCallEventHook(async (ev, d) => {
       else { try { await rt.pc.addIceCandidate(d.cand); } catch { /* */ } }
       break;
     }
-    case 'call:media': if (c?.id === d.call_id) patch({ peerMuted: !!d.muted, peerCam: d.cam !== false }); break;
+    case 'call:media': if (c?.id === d.call_id) patch({ peerMuted: !!d.muted, peerCam: d.cam !== false, peerScreen: !!d.screen }); break;
     case 'call:end': if (c && c.id === d.call_id) cleanup(d.status); break;
     case 'call:error': toast(d.msg, 'error'); cleanup(); break;
     default:
@@ -293,7 +333,7 @@ async function toggleCam() {
       const s = await navigator.mediaDevices.getUserMedia({ video: true }); track = s.getVideoTracks()[0];
       rt.local.addTrack(track);
       const sender = rt.pc?.getSenders().find((x) => x.track?.kind === 'video');
-      if (sender) await sender.replaceTrack(track); else if (rt.pc) { rt.pc.addTrack(track, rt.local); await renegotiate(); }
+      if (sender) await sender.replaceTrack(track); else if (rt.pc) { rt.pc.addTrack(track, rt.local); await reoffer(); }
       patch({ cam: true, video: true }); if (c.id) wsSend('call:media', { call_id: c.id, muted: c.muted, cam: true }); return;
     } catch { toast('دسترسی به دوربین داده نشد.', 'error'); return; }
   }
@@ -307,42 +347,101 @@ async function renegotiate(policy) {
   await pc.setLocalDescription(o);
   wsSend('call:offer', { call_id: c.id, gen: rt.gen, policy, sdp: pc.localDescription.toJSON() });
 }
+// Adding/removing a track must renegotiate on the SAME peer connection.
+// renegotiate() rebuilds it (new ICE generation), which re-gathers candidates and
+// stalls the whole call - including the audio that is already flowing.
+async function reoffer() {
+  const c = getState().call; if (!rt.pc || !c?.id) return;
+  const pc = rt.pc;
+  const o = await pc.createOffer();
+  await pc.setLocalDescription(o);
+  wsSend('call:offer', { call_id: c.id, gen: rt.gen, sdp: pc.localDescription.toJSON() });
+}
 async function toggleScreen() {
   const c = getState().call; if (!c || !rt.pc) return;
-  const sender = rt.pc.getSenders().find((x) => x.track?.kind === 'video');
+  const sender = (kind) => rt.pc.getSenders().find((x) => (x.track?.kind || x.kind) === kind);
   if (rt.screen) {
-    rt.screen.getTracks().forEach((t) => t.stop()); rt.screen = null;
-    const cam = rt.local?.getVideoTracks()[0];
-    if (sender) await sender.replaceTrack(cam || null);
-    patch({ screen: false }); return;
+    rt.screen.getTracks().forEach((t) => { t.onended = null; t.stop(); }); rt.screen = null;
+    // Drop the now-dead screen track first, otherwise it looks like "the camera"
+    // and the peer keeps a frozen frame instead of going back to plain audio.
+    rt.local?.getTracks().forEach((t) => { if (t.readyState === 'ended') rt.local.removeTrack(t); });
+    const vs = sender('video');
+    if (vs) {
+      const cam = rt.local?.getVideoTracks()[0];
+      if (cam) { await vs.replaceTrack(cam); await applyVideoProfile('camera'); }
+      else {
+        // Nothing to fall back to: drop the sender so the peer stops showing a
+        // frozen frame, and take the transceiver out of the negotiated set.
+        try { rt.pc.removeTrack(vs); } catch { /* */ }
+        await reoffer();
+      }
+    }
+    rt.local?.getTracks().forEach((t) => { if (!t.isLive || t.readyState === 'ended') rt.local.removeTrack(t); });
+    rt.local?.getTracks().forEach((t) => { if (!t.isLive || t.readyState === 'ended') rt.local.removeTrack(t); });
+    if (rt.screenMic) {
+      const as = sender('audio');
+      if (as) await as.replaceTrack(rt.screenMic.track);
+      rt.local?.getAudioTracks().forEach((t) => { t.enabled = !rt.screenMic.muted; });
+      rt.screenMic = null;
+    }
+    patch({ screen: false });
+    if (c.id) wsSend('call:media', { call_id: c.id, muted: c.muted, cam: c.cam, screen: false });
+    return;
   }
   if (!navigator.mediaDevices.getDisplayMedia) { toast('اشتراک صفحه در این مرورگر پشتیبانی نمی‌شود.', 'error'); return; }
-  try {
-    rt.screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
-    const tr = rt.screen.getVideoTracks()[0];
-    tr.onended = () => { if (rt.screen) toggleScreen(); };
-    if (sender) await sender.replaceTrack(tr); else { rt.pc.addTrack(tr, rt.screen); await renegotiate(); }
-    patch({ screen: true });
-  } catch { /* user cancelled */ }
+  const video = { frameRate: SCREEN.fps, width: SCREEN.w, height: SCREEN.h };
+  let stream;
+  // System/tab audio is optional: requesting it can reject the whole capture on
+  // some platforms, so fall back to video-only. A real cancel must not re-prompt.
+  try { stream = await navigator.mediaDevices.getDisplayMedia({ video, audio: true }); }
+  catch (e) {
+    if (e?.name === 'NotAllowedError' || e?.name === 'AbortError') return;
+    try { stream = await navigator.mediaDevices.getDisplayMedia({ video }); }
+    catch { return; }
+  }
+  const tr = stream.getVideoTracks()[0];
+  if (!tr) { stream.getTracks().forEach((t) => t.stop()); return; }
+  rt.screen = stream;
+  rt.local?.addTrack(tr); // keep it in the local stream so a relay rebuild re-adds it
+  tr.contentHint = 'detail';
+  tr.onended = () => { if (rt.screen) toggleScreen(); };
+  const vs = sender('video');
+  if (vs) { await vs.replaceTrack(tr); await applyVideoProfile('screen'); }
+  else { rt.pc.addTrack(tr, rt.local); await reoffer(); await applyVideoProfile('screen'); }
+  // Tab audio replaces the mic for the duration of the share (one audio sender,
+  // no renegotiation), then the mic is put back exactly as it was.
+  const at = stream.getAudioTracks()[0];
+  const as = sender('audio');
+  if (at && as) {
+    rt.screenMic = { track: as.track, muted: !!c.muted };
+    rt.local?.getAudioTracks().forEach((t) => { t.enabled = false; });
+    await as.replaceTrack(at);
+  }
+  patch({ screen: true });
+  if (c.id) wsSend('call:media', { call_id: c.id, muted: c.muted, cam: c.cam, screen: true });
 }
 
 export default function CallLayer() {
   const c = useStore((s) => s.call);
-  const [, force] = useState(0);
+  const [dur, setDur] = useState('');
   const rv = useRef(null); const lv = useRef(null); const ra = useRef(null);
-  useEffect(() => { if (c?.phase !== 'active') return undefined; const t = setInterval(() => force((x) => x + 1), 1000); return () => clearInterval(t); }, [c?.phase]);
+  useEffect(() => {
+    if (c?.phase !== 'active') { setDur(''); return undefined; }
+    const t = setInterval(() => setDur(fmtDur((Date.now() - (c.since || Date.now())) / 1000)), 500);
+    return () => clearInterval(t);
+  }, [c?.phase, c?.since]);
   useEffect(() => {
     if (rv.current && rt.remote && rv.current.srcObject !== rt.remote) { rv.current.srcObject = rt.remote; rv.current.play().catch(() => {}); }
     if (ra.current && rt.remote && ra.current.srcObject !== rt.remote) { ra.current.srcObject = rt.remote; ra.current.play().catch(() => {}); }
     if (lv.current && rt.local && lv.current.srcObject !== (rt.screen || rt.local)) { lv.current.srcObject = rt.screen || rt.local; lv.current.play().catch(() => {}); }
   });
   if (!c) return null;
-  const hasRemoteVideo = !!rt.remote?.getVideoTracks().length && c.peerCam !== false && c.phase === 'active';
+  const hasRemoteVideo = !!rt.remote?.getVideoTracks().length && (c.peerCam !== false || !!c.peerScreen) && c.phase === 'active';
   const showLocal = (c.cam || c.screen) && rt.local;
   const status = c.phase === 'requesting' ? 'در حال آماده‌سازی…' : c.phase === 'calling' ? (c.offline ? 'در انتظار آنلاین شدن…' : 'در حال برقراری تماس…')
     : c.phase === 'incoming' ? (c.video ? 'تماس تصویری ورودی' : 'تماس صوتی ورودی') : c.phase === 'connecting' ? 'در حال اتصال…'
       : c.phase === 'ended' ? ({ declined: 'تماس رد شد', missed: 'بی‌پاسخ', cancelled: 'لغو شد', ended: 'تماس پایان یافت' }[c.status] || 'تماس پایان یافت')
-        : fmtDur((Date.now() - (c.since || Date.now())) / 1000);
+        : dur;
   if (c.min && c.phase === 'active') {
     return (
       <div className="call-pill glass" onClick={() => patch({ min: false })} role="button" tabIndex={0}>
@@ -353,7 +452,7 @@ export default function CallLayer() {
     );
   }
   return (
-    <div className={cx('call-screen', hasRemoteVideo && 'has-video')} role="dialog" aria-label="تماس">
+    <div className={cx('call-screen', hasRemoteVideo && 'has-video', c.screen && 'sharing-out', c.peerScreen && 'sharing-in')} role="dialog" aria-label="تماس">
       <div className="call-bg" style={{ '--c1': c.peer?.color?.[0] || '#4f8cff', '--c2': c.peer?.color?.[1] || '#8b5cf6' }} />
       <video ref={rv} className="call-remote" playsInline autoPlay style={{ display: hasRemoteVideo ? 'block' : 'none' }} />
       {!hasRemoteVideo && <audio ref={ra} autoPlay />}
@@ -369,7 +468,7 @@ export default function CallLayer() {
           <div className="call-status">{status}{c.weak && c.phase === 'active' ? ' · اتصال ضعیف' : ''}{c.peerMuted ? ' · میکروفون طرف مقابل خاموش است' : ''}</div>
         </div>
       )}
-      {hasRemoteVideo && <div className="call-over"><b>{userName(c.peer)}</b><span>{status}</span></div>}
+      {hasRemoteVideo && <div className="call-over"><b>{userName(c.peer)}</b><span>{status}</span>{c.peerScreen && <span className="call-share-tag"><Icon name="screen" />اشتراک صفحه</span>}</div>}
       <div className="call-controls">
         {c.phase === 'incoming' ? (
           <>
