@@ -131,6 +131,9 @@ export default function Auth() {
                   حساب کاربری ندارید؟ کافی است نام کاربری دلخواه را وارد کنید تا
                   <button type="button" className="auth-inline" onClick={() => { if (USER_RE.test(username)) submitUsername(); else setError('ابتدا نام کاربری دلخواه را وارد کنید'); }}>حساب جدید بسازید</button>
                 </div>
+                <button type="button" className="auth-qr-mobile-btn" onClick={() => go('qr')}>
+                  <Icon name="qr" /> ورود سریع با QR
+                </button>
               </form>
             </div>
             {/* Right panel: QR code (Telegram desktop style) */}
@@ -300,6 +303,7 @@ function QrLogin({ remember, onBack }) {
   const [err, setErr] = useState('');
   const [state, setState] = useState('loading');
   const alive = useRef(true);
+  const qrRef = useRef(null); qrRef.current = qr;
   useEffect(() => {
     alive.current = true;
     let poll; let refresh;
@@ -322,7 +326,6 @@ function QrLogin({ remember, onBack }) {
     }, 1500);
     return () => { alive.current = false; clearInterval(poll); clearTimeout(refresh); };
   }, [remember]);
-  const qrRef = useRef(null); qrRef.current = qr;
   const link = qr ? `${location.origin}${location.pathname}#qr/${qr.token}` : '';
   return (
     <div className="qr-page">

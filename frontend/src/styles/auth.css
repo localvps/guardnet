@@ -303,11 +303,23 @@
   .auth-qr-panel .qr-sub { font-size: 13px; }
 }
 
+/* QR mobile button — hidden by default, shown when QR panel is hidden on mobile */
+.auth-qr-mobile-btn { display: none; }
+
 @media (max-width: 480px) {
   .auth-scroll { padding-top: calc(24px + var(--safe-t)); padding-inline: 16px; }
   .auth-container { border-radius: 24px; }
   .auth-form-panel { padding: 24px 20px; }
   .auth-qr-panel { display: none; }
+  .auth-qr-mobile-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 12px; margin-top: 8px;
+    border: 1px solid var(--glass-stroke); border-radius: 12px;
+    background: var(--hover); color: var(--text); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast);
+  }
+  .auth-qr-mobile-btn:hover { background: var(--active); border-color: var(--accent); }
+  .auth-qr-mobile-btn .ic { width: 20px; height: 20px; }
   .auth-logo, .auth-monkey { width: 120px; height: 120px; }
   .auth-logo svg { width: 108px; height: 108px; }
   .monkey { width: 120px; height: 120px; }
