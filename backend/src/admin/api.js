@@ -436,5 +436,151 @@ router.delete('/admins/:id', SUPER_RE, h((req) => {
   return { ok: true };
 }));
 
+/* ------------------------------------------------------------------ analytics */
+router.get('/analytics', V, h((req) => {
+  const t = now(); const D = 86400e3;
+  const days = []; for (let i = 29; i >= 0; i--) days.push(Math.floor((t - i * D) / D) * D);
+  // user growth
+  const sRows = q('SELECT (created_at/86400000)*86400000 AS b, COUNT(*) n FROM users WHERE created_at>=? AND is_bot=0 AND pass_hash IS NOT NULL GROUP BY b', days[0]);
+  const sm = new Map(sRows.map((r) => [r.b, r.n]));
+  // message activity by day
+  const mRows = q("SELECT (created_at/86400000)*86400000 AS b, COUNT(*) n FROM messages WHERE created_at>=? AND type<>'service' GROUP BY b", days[0]);
+  const mm = new Map(mRows.map((r) => [r.b, r.n]));
+  // active users by day (users who sent at least 1 message)
+  const aRows = q("SELECT (created_at/86400000)*86400000 AS b, COUNT(DISTINCT sender_id) n FROM messages WHERE created_at>=? AND type<>'service' GROUP BY b", days[0]);
+  const am = new Map(aRows.map((r) => [r.b, r.n]));
+  // top users by message count (30 days)
+  const topUsers = q("SELECT m.sender_id, u.username, u.name, COUNT(*) n FROM messages m LEFT JOIN users u ON u.id=m.sender_id WHERE m.created_at>=? AND m.type<>'service' AND u.deleted=0 GROUP BY m.sender_id ORDER BY n DESC LIMIT 10", t - 30 * D);
+  // top chats by message count (30 days)
+  const topChats = q("SELECT m.chat_id, c.title, c.type, COUNT(*) n FROM messages m LEFT JOIN chats c ON c.id=m.chat_id WHERE m.created_at>=? AND m.type<>'service' GROUP BY m.chat_id ORDER BY n DESC LIMIT 10", t - 30 * D);
+  // engagement: DAU/MAU ratio
+  const mau = qv("SELECT COUNT(DISTINCT sender_id) FROM messages WHERE created_at>=? AND type<>'service'", t - 30 * D);
+  const dau = qv("SELECT COUNT(DISTINCT sender_id) FROM messages WHERE created_at>=? AND type<>'service'", t - D);
+  // media stats
+  const mediaStats = {
+    images: qv("SELECT COUNT(*) FROM files WHERE mime LIKE 'image/%' AND done=1"),
+    videos: qv("SELECT COUNT(*) FROM files WHERE mime LIKE 'video/%' AND done=1"),
+    audio: qv("SELECT COUNT(*) FROM files WHERE mime LIKE 'audio/%' AND done=1"),
+    docs: qv("SELECT COUNT(*) FROM files WHERE mime NOT LIKE 'image/%' AND mime NOT LIKE 'video/%' AND mime NOT LIKE 'audio/%' AND done=1"),
+    total_bytes: qv('SELECT COALESCE(SUM(size),0) FROM files WHERE done=1'),
+  };
+  // retention: users active in week 1 vs week 2
+  const w1 = qv("SELECT COUNT(DISTINCT sender_id) FROM messages WHERE created_at>=? AND created_at<? AND type<>'service'", t - 14 * D, t - 7 * D);
+  const w2 = qv("SELECT COUNT(DISTINCT sender_id) FROM messages WHERE created_at>=? AND type<>'service'", t - 7 * D);
+  return {
+    growth: days.map((b) => ({ t: b, users: sm.get(b) || 0, messages: mm.get(b) || 0, active: am.get(b) || 0 })),
+    topUsers, topChats,
+    engagement: { mau, dau, ratio: mau ? Math.round(dau / mau * 100) / 100 : 0, retention: w1 ? Math.round(w2 / w1 * 100) / 100 : 0 },
+    media: mediaStats,
+    totals: {
+      users_30d: qv('SELECT COUNT(*) FROM users WHERE created_at>=? AND is_bot=0 AND pass_hash IS NOT NULL', t - 30 * D),
+      messages_30d: qv("SELECT COUNT(*) FROM messages WHERE created_at>=? AND type<>'service'", t - 30 * D),
+      chats_30d: qv('SELECT COUNT(*) FROM chats WHERE created_at>=?', t - 30 * D),
+      calls_30d: qv('SELECT COUNT(*) FROM calls WHERE started_at>=?', t - 30 * D),
+    },
+  };
+}));
+
+/* ------------------------------------------------------------------ bulk operations */
+router.post('/bulk-action', SUPER_RE, h((req) => {
+  const b = body(req);
+  const action = str(b.action, 30);
+  const filter = str(b.filter, 20);
+  const search = str(b.search, 64).trim().replace(/^@/, '');
+  const t = now();
+  const where = ['u.is_bot=0 AND u.deleted=0 AND u.pass_hash IS NOT NULL']; const args = [];
+  if (search) { where.push("(u.username LIKE ? ESCAPE '\\' OR u.name LIKE ? ESCAPE '\\' OR u.reg_ip=?)"); args.push(likeEsc(search), likeEsc(search), search); }
+  const filters = { banned: 'u.banned=1', unbanned: 'u.banned=0', premium: `u.premium_until>${t}`, verified: 'u.verified=1', unverified: 'u.verified=0', twofa: 'u.totp_on=1', active: 'u.banned=0', inactive: 'u.last_seen<' + (t - 30 * 86400e3) };
+  if (filters[filter]) where.push(filters[filter]);
+  const W = where.join(' AND ');
+  const ids = q(`SELECT u.id FROM users u WHERE ${W}`, ...args).map((r) => r.id);
+  if (!ids.length) return { ok: true, affected: 0 };
+  let affected = 0;
+  const summary = { action, filter, search, count: ids.length };
+  if (action === 'ban') {
+    ids.forEach((uid) => { const u = rowUser(uid); if (u && u.id !== OFFICIAL_ID && u.id !== BOT_ID) { run('UPDATE users SET banned=1, ban_reason=?, banned_at=? WHERE id=?', b.reason || 'اقدام دسته‌جمعی', t, uid); killAll(uid, { banned: true }); affected++; } });
+  } else if (action === 'unban') {
+    ids.forEach((uid) => { run('UPDATE users SET banned=0, ban_reason=NULL, banned_at=NULL WHERE id=?', uid); affected++; });
+  } else if (action === 'verify') {
+    ids.forEach((uid) => { run('UPDATE users SET verified=1 WHERE id=?', uid); affected++; });
+  } else if (action === 'unverify') {
+    ids.forEach((uid) => { run('UPDATE users SET verified=0 WHERE id=?', uid); affected++; });
+  } else if (action === 'premium') {
+    const days = Math.min(int(b.days, 0), 3650);
+    ids.forEach((uid) => { const u = rowUser(uid); const until = Math.max(t, u.premium_until || 0) + days * 86400e3; run('UPDATE users SET premium_until=? WHERE id=?', until, uid); affected++; });
+  } else if (action === 'message') {
+    const text = str(b.text, 4000).trim();
+    if (!text) err(400, 'متن پیام را بنویسید.');
+    let i = 0; const step = () => { const end = Math.min(i + 50, ids.length); for (; i < end; i++) systemMessage(ids[i], text); if (i < ids.length) setImmediate(step); }; step();
+    affected = ids.length;
+  } else if (action === 'force_logout') {
+    ids.forEach((uid) => { killAll(uid, { admin: true }); affected++; });
+  } else err(400, 'اقدام نامعتبر است.');
+  ids.forEach((uid) => { presenceChanged(uid); broadcastUser(uid); });
+  audit(req, 'bulk.' + action, `${affected} users`, summary);
+  return { ok: true, affected };
+}));
+
+/* ------------------------------------------------------------------ system settings */
+const sysDefaults = { maintenance: false, maintenance_msg: '', registrations: true, guest_read: true, max_upload_mb: 100, message_rate: 30, turn_configured: false };
+router.get('/system-settings', V, h(() => {
+  const row = q1('SELECT v FROM kv WHERE k=?', 'system_settings');
+  const s = row ? J(row.v, sysDefaults) : { ...sysDefaults };
+  s.turn_configured = !!(process.env.WEBRTC_TURN_URLS && process.env.WEBRTC_TURN_USER);
+  s.turn_urls = process.env.WEBRTC_TURN_URLS || '';
+  s.turn_user = process.env.WEBRTC_TURN_USER || '';
+  s.force_turn = process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
+  return s;
+}));
+router.patch('/system-settings', SUPER_RE, h((req) => {
+  const b = body(req);
+  const row = q1('SELECT v FROM kv WHERE k=?', 'system_settings');
+  const s = row ? J(row.v, sysDefaults) : { ...sysDefaults };
+  if (typeof b.maintenance === 'boolean') s.maintenance = b.maintenance;
+  if (typeof b.maintenance_msg === 'string') s.maintenance_msg = str(b.maintenance_msg, 500).slice(0, 500);
+  if (typeof b.registrations === 'boolean') s.registrations = b.registrations;
+  if (typeof b.guest_read === 'boolean') s.guest_read = b.guest_read;
+  if (typeof b.max_upload_mb === 'number') s.max_upload_mb = Math.min(Math.max(b.max_upload_mb, 1), 500);
+  if (typeof b.message_rate === 'number') s.message_rate = Math.min(Math.max(b.message_rate, 5), 120);
+  ex('INSERT OR REPLACE INTO kv(k,v) VALUES(?,?)', 'system_settings', JSON.stringify(s));
+  audit(req, 'system.settings', JSON.stringify(Object.keys(b)), s);
+  return { ok: true, settings: s };
+}));
+
+/* ------------------------------------------------------------------ media browser */
+router.get('/media', V, h((req) => {
+  const { p, size, off } = page(req, 30);
+  const type = str(req.query.type, 10);
+  const where = ['done=1']; const args = [];
+  if (type === 'image') { where.push("mime LIKE 'image/%'"); }
+  else if (type === 'video') { where.push("mime LIKE 'video/%'"); }
+  else if (type === 'audio') { where.push("mime LIKE 'audio/%'"); }
+  else if (type === 'doc') { where.push("mime NOT LIKE 'image/%' AND mime NOT LIKE 'video/%' AND mime NOT LIKE 'audio/%'"); }
+  const W = where.join(' AND ');
+  const total = qv(`SELECT COUNT(*) FROM files WHERE ${W}`, ...args);
+  const items = q(`SELECT f.*, u.username owner_name FROM files f LEFT JOIN users u ON u.id=f.owner WHERE ${W} ORDER BY f.id DESC LIMIT ? OFFSET ?`, ...args, size, off)
+    .map((f) => ({ id: f.id, mime: f.mime, size: f.size, owner: f.owner, owner_name: f.owner_name, url: fileUrl(f.id), created_at: f.created_at, name: f.name }));
+  return { items, total, page: p, size };
+}));
+router.delete('/media/:id', SUPER, h((req) => {
+  const f = q1('SELECT * FROM files WHERE id=?', int(req.params.id));
+  if (!f) err(404, 'فایل یافت نشد.');
+  try { fs.unlinkSync(f.path); } catch { /* */ }
+  run('DELETE FROM files WHERE id=?', f.id);
+  audit(req, 'media.delete', `${f.id}`, { mime: f.mime, size: f.size });
+  return { ok: true };
+}));
+
+/* ------------------------------------------------------------------ global message search */
+router.get('/search/messages', MOD, h((req) => {
+  const { p, size, off } = page(req, 30);
+  const s = str(req.query.q, 200).trim();
+  if (!s || s.length < 2) return { items: [], total: 0, page: p, size };
+  const pattern = '%' + s.replace(/[\%_]/g, (c) => '\\' + c) + '%';
+  const items = q("SELECT m.id, m.chat_id, m.sender_id, m.type, m.text, m.created_at, u.username, u.name sender_name, c.title chat_title, c.type chat_type FROM messages m LEFT JOIN users u ON u.id=m.sender_id LEFT JOIN chats c ON c.id=m.chat_id WHERE m.deleted=0 AND m.type<>'service' AND m.text LIKE ? ESCAPE '\\' ORDER BY m.id DESC LIMIT ? OFFSET ?", pattern, size, off);
+  const total = qv("SELECT COUNT(*) FROM messages m WHERE m.deleted=0 AND m.type<>'service' AND m.text LIKE ? ESCAPE '\\'", pattern);
+  return { items, total, page: p, size };
+}));
+
 // live stats push every 4 s while admins are connected
 setInterval(() => { if (adminHub.count()) { try { adminHub.broadcast('stats', stats()); } catch (e) { console.error('admin stats', e); } } }, 4000).unref();

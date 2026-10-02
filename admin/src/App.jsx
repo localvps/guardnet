@@ -14,19 +14,29 @@ import Security from './pages/Security.jsx';
 import Audit from './pages/Audit.jsx';
 import Admins from './pages/Admins.jsx';
 import Account from './pages/Account.jsx';
+import Analytics from './pages/Analytics.jsx';
+import BulkOps from './pages/BulkOps.jsx';
+import SystemSettings from './pages/SystemSettings.jsx';
+import MediaBrowser from './pages/MediaBrowser.jsx';
+import MessageSearch from './pages/MessageSearch.jsx';
 
 const NAV = [
   ['dashboard', 'داشبورد', 'grid', 'viewer'],
+  ['analytics', 'تحلیل‌ها', 'activity', 'viewer'],
   ['users', 'کاربران', 'users', 'viewer'],
   ['chats', 'گفتگوها', 'message', 'viewer'],
+  ['search', 'جستجوی پیام', 'search', 'moderator'],
+  ['media', 'رسانه‌ها', 'image', 'viewer'],
   ['reports', 'گزارش‌ها', 'flag', 'viewer'],
+  ['bulk', 'اقدامات دسته‌جمعی', 'zap', 'superadmin'],
   ['broadcast', 'اطلاعیه همگانی', 'megaphone', 'superadmin'],
   ['security', 'امنیت', 'shield', 'viewer'],
+  ['settings', 'تنظیمات سیستم', 'gear', 'superadmin'],
   ['audit', 'گزارش ممیزی', 'scroll', 'superadmin'],
   ['admins', 'مدیران', 'key', 'superadmin'],
   ['account', 'حساب من', 'user', 'viewer'],
 ];
-const PAGES = { dashboard: Dashboard, users: Users, chats: Chats, reports: Reports, broadcast: Broadcast, security: Security, audit: Audit, admins: Admins, account: Account };
+const PAGES = { dashboard: Dashboard, analytics: Analytics, users: Users, chats: Chats, search: MessageSearch, media: MediaBrowser, reports: Reports, bulk: BulkOps, broadcast: Broadcast, security: Security, settings: SystemSettings, audit: Audit, admins: Admins, account: Account };
 
 export default function App() {
   const [phase, setPhase] = useState('login');

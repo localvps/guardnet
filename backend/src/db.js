@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS audit_log(
   ip TEXT, at INTEGER, prev_hash TEXT, hash TEXT);
 CREATE TABLE IF NOT EXISTS security_settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS ip_blocks(ip TEXT PRIMARY KEY, reason TEXT, created_at INTEGER, created_by INTEGER, expires_at INTEGER);
+CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT);
 `);
 
 // Migrations for existing databases
