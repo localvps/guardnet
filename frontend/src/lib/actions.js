@@ -57,7 +57,7 @@ export const DEFAULT_SETTINGS = {
   chatWidth: 'normal', bubbleStyle: 'classic', showAvatars: true, showNames: true, confirmDelete: true,
   wallpaperIntensity: 100, messageSound: true, sidebarDensity: 'comfortable', enterToSend: true,
   readReceipts: true, lastSeenPrivacy: 'all', photoPrivacy: 'all', callsPrivacy: 'all', groupsPrivacy: 'all',
-  forwardsPrivacy: 'all', archivedChats: false, messageFontSize: 16, bubbleMaxWidth: 780,
+  forwardsPrivacy: 'all', archivedChats: false, messageFontSize: 16, bubbleMaxWidth: 640,
   showOnlineStatus: true, typingIndicator: true, linkPreview: true, voicePlaybackSpeed: 1,
   savedGifs: [],
 };
@@ -84,7 +84,8 @@ export function applySettings(s = settings()) {
   root.dataset.chatWidth = s.chatWidth || 'normal';
   root.dataset.sidebarDensity = s.sidebarDensity || 'comfortable';
   if (s.wallpaperIntensity != null) root.style.setProperty('--wall-opacity', `${s.wallpaperIntensity / 100}`);
-  if (s.bubbleMaxWidth != null) root.style.setProperty('--chat-max', `${s.bubbleMaxWidth}px`);
+  if (s.bubbleMaxWidth != null && s.bubbleMaxWidth !== DEFAULT_SETTINGS.bubbleMaxWidth) root.style.setProperty('--chat-max', `${s.bubbleMaxWidth}px`);
+  else root.style.removeProperty('--chat-max');
   root.dataset.showAvatars = s.showAvatars ? 'on' : 'off';
   root.dataset.showNames = s.showNames ? 'on' : 'off';
   root.dataset.linkPreview = s.linkPreview ? 'on' : 'off';
@@ -310,7 +311,7 @@ export function folderMatch(f, c) {
 export async function openChat(id, { jumpTo } = {}) {
   const st = getState();
   if (st.active && st.active !== id) saveDraftNow();
-  setState({ active: id, reply: null, edit: null, select: null, jump: jumpTo || null, panel: st.panel && window.innerWidth > 1180 ? st.panel : null });
+  setState({ active: id, reply: null, edit: null, select: null, jump: jumpTo || null, panel: st.active === id && window.innerWidth > 1180 ? st.panel : null });
   const c = getState().chats.get(id);
   if (!c) {
     try { const r = await api(`/chats/${id}`); putUsers(r.users); putChat(r.chat); } catch (e) { toast(e.message, 'error'); setState({ active: null }); return; }

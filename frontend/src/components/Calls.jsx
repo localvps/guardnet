@@ -10,24 +10,38 @@ import { api } from '../lib/api.js';
 // STUN and TURN, so calls keep working on a fully national network with no
 // Google/Cloudflare STUN and no third-party TURN. Hardcoded to our own relay
 // so a slow /calls/ice response can never downgrade a call to host candidates.
-let ICE_CONFIG = [
-  { urls: 'stun:YOUR_PUBLIC_IP:3478' },
-  { urls: ['turn:YOUR_PUBLIC_IP:3478?transport=udp', 'turn:YOUR_PUBLIC_IP:3478?transport=tcp', 'turns:YOUR_PUBLIC_IP:5349?transport=tcp'] },
-];
-let ICE_POLICY = 'relay';
-let ICE_TURN = true; // we always have our own relay
+let ICE_CONFIG = [{ urls: 'stun:YOUR_PUBLIC_IP:3478' }];
+let ICE_POLICY = 'all';
+let ICE_TURN = false;
+let iceReady = null;
 
+// A TURN entry without credentials makes RTCPeerConnection throw
+// InvalidAccessError, so never hand one to the browser.
+function usableIce(list) {
+  return (list || []).filter((s) => {
+    const urls = Array.isArray(s.urls) ? s.urls : [s.urls];
+    const needsAuth = urls.some((u) => /turns?:/i.test(u));
+    return !needsAuth || (s.username && s.credential);
+  });
+}
 async function loadIceConfig() {
   try {
     const r = await api('/calls/ice');
     if (r?.iceServers?.length) {
-      ICE_CONFIG = r.iceServers;
+      ICE_CONFIG = usableIce(r.iceServers);
       ICE_POLICY = r.iceTransportPolicy || 'relay';
-      ICE_TURN = r.iceServers.some((s) => (Array.isArray(s.urls) ? s.urls : [s.urls]).some((u) => /turns?:/i.test(u)));
+      ICE_TURN = ICE_CONFIG.some((s) => (Array.isArray(s.urls) ? s.urls : [s.urls]).some((u) => /turns?:/i.test(u)));
     }
-  } catch { /* keep the built-in self-hosted relay */ }
+  } catch { /* keep the built-in self-hosted STUN; calls still work without TURN */ }
+  return ICE_CONFIG;
 }
-const iceReady = loadIceConfig();
+/** Load TURN credentials before the first call. The app loads before login, so
+ *  the first request can be unauthenticated — retry once we may have a token. */
+async function ensureIce() {
+  if (!iceReady) iceReady = loadIceConfig();
+  await iceReady;
+  if (!ICE_TURN) { iceReady = loadIceConfig(); await iceReady; }
+}
 
 // High-quality audio constraints
 const AUDIO_C = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
@@ -107,7 +121,7 @@ const patch = (p) => { const c = getState().call; if (c) setState({ call: { ...c
 export async function startCall(user, video) {
   if (getState().call) { toast('در حال حاضر یک تماس فعال دارید.', 'error'); return; }
   if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) { toast('مرورگر شما از تماس پشتیبانی نمی‌کند.', 'error'); return; }
-  await iceReady; // never dial without knowing the TURN servers
+  await ensureIce(); // never dial without knowing the TURN servers
   rt.relayTried = false; rt.pendingIce = [];
   setState({ call: { phase: 'requesting', peer: user, video, out: true, muted: false, cam: video, min: false } });
   try {
@@ -194,7 +208,7 @@ async function accept() {
   try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_C, video: c.video ? VIDEO_C : false }); } catch {
     try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: true }); patch({ cam: false }); toast('دوربین در دسترس نیست؛ تماس صوتی برقرار می‌شود.'); } catch { toast('دسترسی به میکروفون داده نشد.', 'error'); wsSend('call:decline', { call_id: c.id }); cleanup(); return; }
   }
-  await iceReady; // need TURN before we start gathering
+  await ensureIce(); // need TURN before we start gathering
   rt.relayTried = false; rt.pendingIce = [];
   makePc(c.id);
   wsSend('call:accept', { call_id: c.id });
