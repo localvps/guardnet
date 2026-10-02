@@ -24,7 +24,7 @@ export const BOT_USERNAME = 'GuardNetBot';
 export const MB = 1024 * 1024;
 export const LIMITS = {
   free: { upload: 20 * MB, bio: 70, pins: 5, folders: 5, story_hours: 24 },
-  premium: { upload: 200 * MB, bio: 300, pins: 20, folders: 15, story_hours: 48 },
+  premium: { upload: 500 * MB, bio: 500, pins: 50, folders: 30, story_hours: 72 },
 };
 export const CHUNK = 4 * MB;
 export const USERNAME_RE = /^[A-Za-z][A-Za-z0-9_]{4,31}$/;

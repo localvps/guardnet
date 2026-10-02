@@ -54,13 +54,18 @@ export const DEFAULT_SETTINGS = {
   theme: 'dark', accent: '#3390ec', fontSize: 16, radius: 16, motion: true, blur: true, wallpaper: 'gradient',
   sendEnter: true, sound: true, notify: true, preview: true, bigEmoji: true, autoplay: true, chatList: 'comfortable',
   folders: [], stealth: false, recentEmoji: [], passcode: null, autolock: 0, time24: true, quickReaction: '👍',
+  chatWidth: 'normal', bubbleStyle: 'classic', showAvatars: true, showNames: true, confirmDelete: true,
+  wallpaperIntensity: 100, messageSound: true, sidebarDensity: 'comfortable', enterToSend: true,
+  readReceipts: true, lastSeenPrivacy: 'all', photoPrivacy: 'all', callsPrivacy: 'all', groupsPrivacy: 'all',
+  forwardsPrivacy: 'all', archivedChats: false, messageFontSize: 16, bubbleMaxWidth: 780,
+  showOnlineStatus: true, typingIndicator: true, linkPreview: true, voicePlaybackSpeed: 1,
 };
 export const settings = () => ({ ...DEFAULT_SETTINGS, ...(getState().me?.settings || {}) });
 
 const ACCENTS_2 = { '#3390ec': '#5eb5f7', '#8774e1': '#b39bff', '#e17076': '#ff9f9f', '#40a7a0': '#6fd6c8', '#eea95b': '#ffd08a', '#e36cb0': '#ff9bd2', '#54b848': '#8ee57f' };
 export function applySettings(s = settings()) {
   const root = document.documentElement;
-  const premiumTheme = ['aurora', 'gold'].includes(s.theme) && !getState().me?.premium;
+  const premiumTheme = ['aurora', 'gold', 'crystal', 'neon', 'cyber', 'ocean'].includes(s.theme) && !getState().me?.premium;
   const theme = premiumTheme ? 'dark' : s.theme === 'system'
     ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : s.theme;
   root.dataset.theme = theme;
@@ -72,6 +77,16 @@ export function applySettings(s = settings()) {
   root.dataset.blur = s.blur ? 'on' : 'off';
   root.dataset.wall = s.wallpaper;
   root.dataset.density = s.chatList;
+  root.dataset.bubbleStyle = s.bubbleStyle || 'classic';
+  root.dataset.chatWidth = s.chatWidth || 'normal';
+  root.dataset.sidebarDensity = s.sidebarDensity || 'comfortable';
+  if (s.wallpaperIntensity != null) root.style.setProperty('--wall-opacity', `${s.wallpaperIntensity / 100}`);
+  if (s.bubbleMaxWidth != null) root.style.setProperty('--chat-max', `${s.bubbleMaxWidth}px`);
+  root.dataset.showAvatars = s.showAvatars ? 'on' : 'off';
+  root.dataset.showNames = s.showNames ? 'on' : 'off';
+  root.dataset.linkPreview = s.linkPreview ? 'on' : 'off';
+  root.dataset.typingIndicator = s.typingIndicator ? 'on' : 'off';
+  root.dataset.showOnline = s.showOnlineStatus ? 'on' : 'off';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : theme === 'midnight' ? '#000000' : '#0e1621');
 }

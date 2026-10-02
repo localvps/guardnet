@@ -106,7 +106,7 @@ function Profile() {
         </div>
         <Field label="نام" value={name} onChange={(v) => { setName(v); setErr({}); }} maxLength={64} error={err.name} />
         <Field label="بیوگرافی" value={bio} onChange={(v) => { setBio(v); setErr({}); }} textarea rows={3} error={err.bio} counter={fa(limit - [...bio].length)}
-          hint={`هر چیزی درباره خودتان. حداکثر ${fa(limit)} نویسه${me.premium ? '' : ' (پریمیوم: ۳۰۰)'}.`} />
+          hint={`هر چیزی درباره خودتان. حداکثر ${fa(limit)} نویسه${me.premium ? '' : ' (پریمیوم: ۵۰۰)'}.`} />
         <Field label="نام کاربری" value={un} onChange={(v) => { setUn(v.replace(/[^A-Za-z0-9_]/g, '')); setErr({}); }} dir="ltr" maxLength={32} error={err.un} suffix={<span className="at">@</span>}
           hint="دیگران می‌توانند شما را با این نام کاربری پیدا کنند. ورود به حساب هم با همین نام انجام می‌شود." />
         {me.premium && <EmojiStatus />}
@@ -402,9 +402,13 @@ const THEMES = [
   { id: 'system', name: 'سیستم', bg: 'linear-gradient(90deg,#0e1621 50%,#dfe7d5 50%)', bub: '#5eb5f7', side: '#17212b' },
   { id: 'aurora', name: 'شفق', bg: 'linear-gradient(135deg,#1b1340,#0d2a4a)', bub: '#6d4bd8', side: '#1a1535', premium: true },
   { id: 'gold', name: 'طلایی', bg: 'linear-gradient(135deg,#1d1608,#2a1f0a)', bub: '#9a7424', side: '#1f190d', premium: true },
+  { id: 'crystal', name: 'کریستال', bg: 'linear-gradient(135deg,#0a1622,#1a2e4a)', bub: '#3b82f6', side: '#0f1a2e', premium: true },
+  { id: 'neon', name: 'نئون', bg: 'linear-gradient(135deg,#0a0a0a,#1a0033)', bub: '#e84393', side: '#111118', premium: true },
+  { id: 'cyber', name: 'سایبر', bg: 'linear-gradient(135deg,#0d1117,#161b22)', bub: '#58a6ff', side: '#0d1117', premium: true },
+  { id: 'ocean', name: 'اقیانوس', bg: 'linear-gradient(135deg,#001f3f,#003d5c)', bub: '#0ea5e9', side: '#002644', premium: true },
 ];
-const ACCENTS = ['#3390ec', '#8774e1', '#e17076', '#40a7a0', '#eea95b', '#e36cb0', '#54b848'];
-const WALLS = [['gradient', 'گرادیان'], ['aurora', 'شفق'], ['ocean', 'اقیانوس'], ['sunset', 'غروب'], ['pattern', 'الگو'], ['plain', 'ساده']];
+const ACCENTS = ['#3390ec', '#8774e1', '#e17076', '#40a7a0', '#eea95b', '#e36cb0', '#54b848', '#f59e0b', '#ef4444', '#3b82f6', '#a855f7', '#06b6d4'];
+const WALLS = [['gradient', 'گرادیان'], ['aurora', 'شفق'], ['ocean', 'اقیانوس'], ['sunset', 'غروب'], ['pattern', 'الگو'], ['plain', 'ساده'], ['mesh', 'مش'], ['dots', 'نقطه‌ها']];
 function Appearance() {
   const me = useStore((s) => s.me);
   const s = { ...settings(), ...(me.settings || {}) };
@@ -438,33 +442,54 @@ function Appearance() {
           </div>
         </div>
         <div className="info-card">
+          <div className="card-title">سبک حباب‌ها</div>
+          <div className="wall-grid">
+            {[['classic', 'کلاسیک'], ['glass', 'شیشه‌ای'], ['minimal', 'مینیمال'], ['rounded', 'گرد']].map(([id, n]) => <button key={id} type="button" className={cx('wall-card', s.bubbleStyle === id && 'on')} onClick={() => setSetting('bubbleStyle', id)}><span className={cx('wall-prev', `bs-${id}`)}><span className="wp-dots" /></span><span className="tc-name">{n}</span></button>)}
+          </div>
+        </div>
+        <div className="info-card">
+          <div className="card-title">عرض گفتگو</div>
+          <div className="wall-grid">
+            {[['compact', 'فشرده'], ['normal', 'معمولی'], ['wide', 'عریض']].map(([id, n]) => <button key={id} type="button" className={cx('wall-card', s.chatWidth === id && 'on')} onClick={() => setSetting('chatWidth', id)}><span className={cx('wall-prev', `cw-${id}`)}><span className="wp-dots" /></span><span className="tc-name">{n}</span></button>)}
+          </div>
+        </div>
+        <div className="info-card">
           <div className="card-title">متن و حباب‌ها</div>
           <Slider label="اندازه متن" min={13} max={20} value={s.fontSize} onChange={(v) => setSetting('fontSize', v)} fmt={(v) => `${fa(v)}px`} />
           <Slider label="گردی گوشه حباب‌ها" min={6} max={22} value={s.radius} onChange={(v) => setSetting('radius', v)} fmt={(v) => `${fa(v)}px`} />
+          <Slider label="عرض حداکثر حباب" min={400} max={1200} step={20} value={s.bubbleMaxWidth} onChange={(v) => setSetting('bubbleMaxWidth', v)} fmt={(v) => `${fa(v)}px`} />
+          <Slider label="شفافیت پس‌زمینه" min={0} max={100} value={s.wallpaperIntensity} onChange={(v) => setSetting('wallpaperIntensity', v)} fmt={(v) => `${fa(v)}٪`} />
           <div className="preview-bubbles">
             <div className="msg in first last"><div className="bubble"><div className="b-text">سلام، GuardNet چطوره؟<span className="meta-space" /></div><span className="b-meta"><span>۱۲:۳۰</span></span></div></div>
             <div className="msg out first last"><div className="bubble"><div className="b-text">عالیه، سریع و امن<span className="meta-space out" /></div><span className="b-meta"><span>۱۲:۳۱</span><Icon name="checks" className="m-check read" /></span></div></div>
           </div>
         </div>
         <div className="info-card">
+          <div className="card-title">رفتار چت</div>
           <Row icon="layers" title="جلوه شیشه‌ای (Blur)" right={<Toggle checked={s.blur} onChange={(v) => setSetting('blur', v)} label="شیشه‌ای" />} />
           <Row icon="activity" title="انیمیشن‌ها و حرکت" right={<Toggle checked={s.motion} onChange={(v) => setSetting('motion', v)} label="انیمیشن" />} />
           <Row icon="smile" title="ایموجی‌های بزرگ" right={<Toggle checked={s.bigEmoji} onChange={(v) => setSetting('bigEmoji', v)} label="ایموجی بزرگ" />} />
           <Row icon="send" title="ارسال با Enter" sub={s.sendEnter ? 'Shift+Enter برای خط جدید' : 'Ctrl+Enter برای ارسال'} right={<Toggle checked={s.sendEnter} onChange={(v) => setSetting('sendEnter', v)} label="ارسال با Enter" />} />
           <Row icon="menu" title="فهرست فشرده گفتگوها" right={<Toggle checked={s.chatList === 'compact'} onChange={(v) => setSetting('chatList', v ? 'compact' : 'comfortable')} label="فهرست فشرده" />} />
+          <Row icon="image" title="نمایش آواتار در گروه‌ها" right={<Toggle checked={s.showAvatars} onChange={(v) => setSetting('showAvatars', v)} label="آواتار" />} />
+          <Row icon="user" title="نمایش نام فرستنده در گروه" right={<Toggle checked={s.showNames} onChange={(v) => setSetting('showNames', v)} label="نام فرستنده" />} />
+          <Row icon="link" title="پیش‌نمایش لینک" right={<Toggle checked={s.linkPreview} onChange={(v) => setSetting('linkPreview', v)} label="پیش‌نمایش" />} />
+          <Row icon="type" title="نمایش «در حال تایپ...»" right={<Toggle checked={s.typingIndicator} onChange={(v) => setSetting('typingIndicator', v)} label="در حال تایپ" />} />
+          <Row icon="circle" title="نمایش وضعیت آنلاین" right={<Toggle checked={s.showOnlineStatus} onChange={(v) => setSetting('showOnlineStatus', v)} label="آنلاین" />} />
+          <Row icon="trash" title="تأیید قبل از حذف پیام" right={<Toggle checked={s.confirmDelete} onChange={(v) => setSetting('confirmDelete', v)} label="تأیید حذف" />} />
         </div>
       </div>
     </div>
   );
 }
-function Slider({ label, min, max, value, onChange, fmt }) {
+function Slider({ label, min, max, step = 1, value, onChange, fmt }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   const pct = ((v - min) / (max - min)) * 100;
   return (
     <div className="slider-row">
       <div className="sl-head"><span>{label}</span><span className="sl-val">{fmt(v)}</span></div>
-      <input type="range" min={min} max={max} value={v} onChange={(e) => setV(+e.target.value)} onPointerUp={() => onChange(v)} onKeyUp={() => onChange(v)} onBlur={() => v !== value && onChange(v)}
+      <input type="range" min={min} max={max} step={step} value={v} onChange={(e) => setV(+e.target.value)} onPointerUp={() => onChange(v)} onKeyUp={() => onChange(v)} onBlur={() => v !== value && onChange(v)}
         style={{ '--p': `${pct}%` }} aria-label={label} dir="ltr" />
     </div>
   );
@@ -480,14 +505,25 @@ function Notifications() {
       <SideHead title="اعلان‌ها و صداها" />
       <div className="scroll">
         <div className="info-card">
+          <div className="card-title">اعلان‌ها</div>
           <Row icon="bell" title="اعلان پیام‌ها" right={<Toggle checked={s.notify} onChange={(v) => { setSetting('notify', v); if (v && perm === 'default') ask(); }} label="اعلان‌ها" />} />
-          <Row icon="eye" title="پیش‌نمایش متن در اعلان" right={<Toggle checked={s.preview} onChange={(v) => setSetting('preview', v)} label="پیش‌نمایش" />} />
-          <Row icon="volume" title="صدای پیام‌ها" right={<Toggle checked={s.sound} onChange={(v) => setSetting('sound', v)} label="صدا" />} />
+          <Row icon="eye" title="پیش‌نمایش متن در اعلان" sub="نمایش متن پیام در اعلان دسکتاپ" right={<Toggle checked={s.preview} onChange={(v) => setSetting('preview', v)} label="پیش‌نمایش" />} />
           {perm !== 'granted' && perm !== 'unsupported' && <Row icon="monitor" title="اعلان‌های دسکتاپ" sub={perm === 'denied' ? 'در تنظیمات مرورگر مسدود است' : 'اجازه نمایش اعلان را بدهید'} onClick={perm === 'default' ? ask : undefined} chevron={perm === 'default'} />}
         </div>
         <div className="info-card">
+          <div className="card-title">صدا</div>
+          <Row icon="volume" title="صدای پیام‌ها" sub="پخش صدا هنگام دریافت پیام جدید" right={<Toggle checked={s.sound} onChange={(v) => setSetting('sound', v)} label="صدای پیام" />} />
+          <Row icon="music" title="صدای پیام درون برنامه" sub="پخش صدا هنگام باز بودن برنامه" right={<Toggle checked={s.messageSound} onChange={(v) => setSetting('messageSound', v)} label="صدا در برنامه" />} />
+        </div>
+        <div className="info-card">
+          <div className="card-title">حریم خصوصی اعلان</div>
+          <Row icon="circle" title="نمایش وضعیت آنلاین" sub="به دیگران نشان داده شود" right={<Toggle checked={s.showOnlineStatus} onChange={(v) => setSetting('showOnlineStatus', v)} label="آنلاین" />} />
+          <Row icon="checks" title="رسید خواندن" sub="اگر خاموش باشد، رسید خواندن دیگران را هم نمی‌بینید" right={<Toggle checked={s.readReceipts} onChange={(v) => setSetting('readReceipts', v)} label="رسید خواندن" />} />
+          <Row icon="type" title="نمایش «در حال تایپ...»" sub="به دیگران نشان داده شود" right={<Toggle checked={s.typingIndicator} onChange={(v) => setSetting('typingIndicator', v)} label="در حال تایپ" />} />
+        </div>
+        <div className="info-card">
           <div className="card-title">واکنش سریع (دوبار کلیک روی پیام)</div>
-          <div className="es-grid">{['👍', '❤️', '🔥', '😂', '🙏', '👏', '🎉', '💯'].map((e) => <button key={e} type="button" className={cx(s.quickReaction === e && 'on')} onClick={() => setSetting('quickReaction', e)}>{e}</button>)}</div>
+          <div className="es-grid">{['👍', '❤️', '🔥', '😂', '🙏', '👏', '🎉', '💯', '😮', '😢', '👎', '🤩'].map((e) => <button key={e} type="button" className={cx(s.quickReaction === e && 'on')} onClick={() => setSetting('quickReaction', e)}>{e}</button>)}</div>
         </div>
       </div>
     </div>
@@ -508,7 +544,7 @@ function Folders() {
   const [edit, setEdit] = useState(null);
   const lim = me.limits?.folders || 5;
   const save = (list) => setSetting('folders', list);
-  const add = (f) => { if (folders.length >= lim) { toast(`حداکثر ${fa(lim)} پوشه مجاز است.${me.premium ? '' : ' با پریمیوم تا ۱۵.'}`, 'error'); return; } save([...folders, { id: `f${Date.now().toString(36)}`, chats: [], ...f }]); };
+  const add = (f) => { if (folders.length >= lim) { toast(`حداکثر ${fa(lim)} پوشه مجاز است.${me.premium ? '' : ' با پریمیوم تا ۳۰.'}`, 'error'); return; } save([...folders, { id: `f${Date.now().toString(36)}`, chats: [], ...f }]); };
   const move = (i, d) => { const l = folders.slice(); const j = i + d; if (j < 0 || j >= l.length) return; [l[i], l[j]] = [l[j], l[i]]; save(l); };
   return (
     <div className="side-view">
@@ -578,14 +614,28 @@ function FolderEdit({ f, onClose, onSave }) {
 function Premium() {
   const me = useStore((s) => s.me);
   const feats = [
-    ['upload', 'آپلود تا ۲۰۰ مگابایت', 'به‌جای ۲۰ مگابایت برای هر فایل'],
-    ['pin', 'سنجاق ۲۰ گفتگو', 'به‌جای ۵ گفتگو'],
-    ['folder', '۱۵ پوشه گفتگو', 'به‌جای ۵ پوشه'],
-    ['info', 'بیوگرافی ۳۰۰ نویسه‌ای', 'به‌جای ۷۰ نویسه'],
+    ['upload', 'آپلود تا ۵۰۰ مگابایت', 'به‌جای ۲۰ مگابایت برای هر فایل'],
+    ['pin', 'سنجاق ۵۰ گفتگو', 'به‌جای ۵ گفتگو'],
+    ['folder', '۳۰ پوشه گفتگو', 'به‌جای ۵ پوشه'],
+    ['info', 'بیوگرافی ۵۰۰ نویسه‌ای', 'به‌جای ۷۰ نویسه'],
     ['sparkles', 'وضعیت ایموجی', 'ایموجی دلخواه کنار نام شما'],
     ['sticker', 'استیکرهای ویژه', '۱۲ استیکر انحصاری'],
-    ['palette', 'تم‌های ویژه', 'تم‌های شفق و طلایی'],
-    ['story', 'استوری ۴۸ ساعته', 'و حالت مخفی مشاهده'],
+    ['palette', '۶ تم ویژه', 'کریستال، نئون، سایبر، اقیانوس، شفق، طلایی'],
+    ['story', 'استوری ۷۲ ساعته', 'و حالت مخفی مشاهده'],
+    ['shield', 'حالت مخفی استوری', 'استوری‌ها را بدون ثبت بازدید ببینید'],
+    ['ghost', 'پروفایل ناشناس', 'مخفی کردن آخرین بازدید و آنلاین بودن'],
+    ['crown', 'نشان پریمیوم', 'نشان ستاره کنار نام و آواتار'],
+    ['zap', 'اولویت در صف', 'ارسال سریع‌تر پیام‌ها و فایل‌ها'],
+    ['star', 'حلقه درخشان آواتار', 'افکت گرافیکی دور آواتار'],
+    ['gift', 'استیکرها و ری‌اکشن‌های ویژه', 'پک‌های انحصاری ری‌اکشن و استیکر'],
+    ['lock', 'قفل پیشرفته برنامه', 'رمز محلی با الگوریتم پیشرفته'],
+    ['cloud', 'پشتیبان‌گیری خودکار', 'ذخیره خودکار تنظیمات و گفتگوها'],
+    ['palette', 'پس‌زمینه‌های انیمیشنی', 'والپیپرهای متحرک و زنده'],
+    ['sliders', 'سبک حباب‌های ویژه', 'حباب‌های کریستال و نئون'],
+    ['messageCircle', 'پاسخ خودکار', 'پاسخ خودکار هنگام عدم آنلاین بودن'],
+    ['archive', 'آرشیو نامحدود', 'آرشیو نامحدود گفتگوهای قدیمی'],
+    ['users', 'گروه‌های بزرگ‌تر', 'تا ۵۰۰۰ عضو در گروه‌ها'],
+    ['star', 'اموجی‌های متحرک', 'ایموجی‌های انیمیشنی اختصاصی'],
   ];
   const cancel = async () => { if (!(await confirmDialog({ title: 'لغو پریمیوم', text: 'امکانات پریمیوم فوراً غیرفعال می‌شوند.', ok: 'لغو پریمیوم', danger: true }))) return; try { const m = await api('/premium/cancel', { method: 'POST', body: {} }); setState({ me: m }); } catch (e) { toast(e.message, 'error'); } };
   return (
@@ -598,8 +648,9 @@ function Premium() {
           <div className="ph-status">{me.premium ? `فعال تا ${fmtDay(me.premium_until)}` : 'امکانات بیشتر، محدودیت‌های کمتر'}</div>
         </div>
         <div className="info-card">
+          <div className="card-title">امکانات پریمیوم</div>
           {feats.map(([ic, t, s], i) => (
-            <div key={t} className="row"><span className="row-ic filled" style={{ background: `hsl(${260 - i * 22} 80% 62%)` }}><Icon name={ic} /></span><span className="row-body"><span className="row-title">{t}</span><span className="row-sub">{s}</span></span></div>
+            <div key={t} className="row"><span className="row-ic filled" style={{ background: `hsl(${260 - i * 16} 80% 62%)` }}><Icon name={ic} /></span><span className="row-body"><span className="row-title">{t}</span><span className="row-sub">{s}</span></span><span className="row-chev"><PremiumStar size={14} /></span></div>
           ))}
         </div>
         {me.premium && <div className="pad"><Button kind="ghost" full onClick={cancel}>لغو اشتراک</Button></div>}

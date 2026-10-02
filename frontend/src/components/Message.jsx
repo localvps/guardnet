@@ -29,11 +29,11 @@ function Message({ m, c, first, last, flash, hl }) {
   const emojiN = m.type === 'text' && settings().bigEmoji && !m.reply && !m.fwd ? isEmojiOnly(m.text) : 0;
   const bare = m.type === 'sticker' || emojiN;
   const media = (m.type === 'image' || m.type === 'video') && !m.text;
-  const onClick = sel ? toggleSel : undefined;
+  const onClickCapture = sel ? toggleSel : undefined;
   const ltr = !!m.text && /^[^A-Za-z\u0590-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]*[A-Za-z]/.test(m.text);
   return (
     <div className={cx('msg', out ? 'out' : 'in', first && 'first', last && 'last', selected && 'selected', flash && 'flash', sel && 'selecting')}
-      data-mid={m.id} onClick={onClick} onDoubleClick={() => !sel && m.id > 0 && react(m, settings().quickReaction || '👍')}>
+      data-mid={m.id} onClickCapture={onClickCapture} onDoubleClick={() => !sel && m.id > 0 && react(m, settings().quickReaction || '👍')}>
       {sel && <span className={cx('msg-check', selected && 'on')}><Icon name="check" /></span>}
       {showAvatar && (
         <div className="msg-av">{last && <Avatar src={sender?.avatar} name={sender?.name} color={sender?.color} size={34} onClick={(e) => { e.stopPropagation(); setState({ panel: { type: 'user', id: m.sender_id } }); }} />}</div>
