@@ -46,7 +46,7 @@ export default function MediaViewer() {
       <div className="vw-stage">
         {it.type === 'video'
           ? <video key={src} src={src} controls autoPlay playsInline className="vw-media" />
-          : <img key={src} src={src} alt="" className={cx('vw-media', zoom > 1 && 'zoomed')} style={{ transform: `scale(${zoom})` }} onClick={(e) => { e.stopPropagation(); setZoom(zoom > 1 ? 1 : 2); }} draggable="false" />}
+          : <img key={src} src={src} alt="" className={cx('vw-media', zoom > 1 && 'zoomed')} style={zoom > 1 ? { width: `${zoom * 100}%`, maxWidth: 'none', maxHeight: 'none' } : undefined} onClick={(e) => { e.stopPropagation(); setZoom(zoom > 1 ? 1 : 2); }} draggable="false" />}
       </div>
       {idx < items.length - 1 && <button type="button" className="vw-nav left" onClick={() => go(1)} aria-label="بعدی"><span>‹</span></button>}
       {idx > 0 && <button type="button" className="vw-nav right" onClick={() => go(-1)} aria-label="قبلی"><span>›</span></button>}
