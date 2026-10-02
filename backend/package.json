@@ -1,0 +1,21 @@
+{
+  "name": "guardnet-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GuardNet messenger — Node.js realtime backend (REST + WebSocket + SQLite)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "create-admin": "node src/cli/create-admin.js"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "express": "^4.22.3",
+    "ws": "^8.22.0"
+  }
+}
