@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { useStore, setState, getState, toast } from '../lib/store.js';
 import {
   meId, userName, userOf, react, pinMessage, openModal, deleteMessages, vote, retryMessage, cancelUpload, openPrivate, resolveAndOpen,
-  sendMessage, settings, setSetting, forwardMessages,
+  sendMessage, settings, setSetting, forwardMessages, isGifSaved, toggleSavedGif,
 } from '../lib/actions.js';
 import { api, assetUrl } from '../lib/api.js';
 import { cx, fa, fmtTime, fmtFull, fmtSize, fmtDur, RichText, isEmojiOnly, previewText, fmtNum } from '../lib/format.jsx';
@@ -156,6 +156,8 @@ function Progress({ m }) {
 function FileBox({ m }) {
   const d = m.data || {};
   const ext = (d.name || '').split('.').pop()?.slice(0, 4).toUpperCase() || 'FILE';
+  const isAudio = d.mime?.startsWith('audio/') || ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac', 'webm', 'opus'].includes((d.name || '').split('.').pop()?.toLowerCase());
+  if (isAudio) return <AudioFileBox m={m} />;
   return (
     <div className="b-file">
       {m.pending ? <span className="file-ic"><Progress m={m} /></span>
@@ -317,6 +319,79 @@ function Reactions({ m, c }) {
   );
 }
 
+/* ------------------------------------------------------------------ audio file player */
+let afPlaying = null;
+function AudioFileBox({ m }) {
+  const d = m.data || {};
+  const a = useRef(null);
+  const [st, setSt] = useState({ play: false, t: 0, dur: 0, speed: settings().voicePlaybackSpeed || 1 });
+  useEffect(() => () => { if (afPlaying === a.current) afPlaying = null; a.current?.pause(); }, []);
+  useEffect(() => { if (a.current) a.current.playbackRate = st.speed; }, [st.speed]);
+  const toggle = (e) => {
+    e.stopPropagation();
+    if (m.pending) { cancelUpload(m.id); return; }
+    const el = a.current; if (!el) return;
+    if (el.paused) {
+      if (afPlaying && afPlaying !== el) afPlaying.pause();
+      afPlaying = el;
+      el.playbackRate = st.speed;
+      el.play().catch(() => toast('پخش ممکن نشد.', 'error'));
+    } else el.pause();
+  };
+  const seek = (e) => {
+    e.stopPropagation();
+    const el = a.current; if (!el || !el.duration) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = (r.right - e.clientX) / r.width;
+    el.currentTime = Math.max(0, Math.min(1, x)) * el.duration;
+  };
+  const cycleSpeed = (e) => {
+    e.stopPropagation();
+    setSt((s) => {
+      const next = SPEEDS[(SPEEDS.indexOf(s.speed) + 1) % SPEEDS.length];
+      setSetting('voicePlaybackSpeed', next);
+      return { ...s, speed: next };
+    });
+  };
+  const p = st.dur ? Math.min(1, st.t / st.dur) : 0;
+  const ext = (d.name || '').split('.').pop()?.slice(0, 4).toUpperCase() || 'AUDIO';
+  const fmtDur2 = (s) => {
+    if (!s || !Number.isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
+  return (
+    <div className="b-file b-audio">
+      <button type="button" className="af-play" onClick={toggle} aria-label={st.play ? 'توقف' : 'پخش'}>
+        {m.pending ? <Spinner size={22} /> : <Icon name={st.play ? 'pause' : 'play'} fill="currentColor" />}
+      </button>
+      <div className="af-body">
+        <div className="af-info">
+          <span className="af-title" dir="auto" title={d.name}>{d.name}</span>
+          <span className="af-meta">{m.pending ? `${fmtSize(Math.round((m.progress || 0) * d.size))} از ${fmtSize(d.size)}` : `${fmtSize(d.size)} · ${ext}`}</span>
+        </div>
+        <div className="af-wave" onClick={seek} role="slider" aria-valuenow={Math.round(p * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="پیشرفت پخش" tabIndex={0}>
+          <span className="af-progress" style={{ width: `${Math.max(p * 100, 2)}%` }} />
+          <span className="af-thumb" style={{ right: `${p * 100}%` }} />
+        </div>
+        <div className="af-foot">
+          <span className="af-time">{fmtDur2(st.play || st.t ? st.t : 0)} / {fmtDur2(st.dur)}</span>
+          <button type="button" className="v-speed" onClick={cycleSpeed} aria-label="سرعت پخش">{st.speed}×</button>
+        </div>
+      </div>
+      {!m.pending && (
+        <a className="file-ic af-dl" href={assetUrl(d.url)} download={d.name} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} aria-label="دانلود"><Icon name="download" /></a>
+      )}
+      {!m.pending && <audio ref={a} src={assetUrl(d.url)} preload="metadata"
+        onPlay={() => setSt((s) => ({ ...s, play: true }))}
+        onPause={() => setSt((s) => ({ ...s, play: false }))}
+        onEnded={() => setSt((s) => ({ ...s, play: false, t: 0 }))}
+        onTimeUpdate={(e) => setSt((s) => ({ ...s, t: e.currentTarget.currentTime }))}
+        onLoadedMetadata={(e) => setSt((s) => ({ ...s, dur: e.currentTarget.duration || 0 }))} />}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ self-destructing timer */
 function TtlTimer({ m }) {
   const [, force] = useState(0);
@@ -357,6 +432,10 @@ export function msgMenu(e, m, c) {
     canEdit && { icon: 'pencil', label: 'ویرایش', onClick: () => setState({ edit: m, reply: null }) },
     copyText && { icon: 'copy', label: 'کپی متن', onClick: () => navigator.clipboard?.writeText(copyText).then(() => toast('کپی شد.', 'ok'), () => toast('کپی ممکن نشد.', 'error')) },
     m.data?.url && { icon: 'download', label: 'دانلود', onClick: () => { const a = document.createElement('a'); a.href = assetUrl(m.data.url); a.download = m.data.name || 'file'; a.target = '_blank'; a.rel = 'noopener'; a.click(); } },
+    m.type === 'gif' && Number.isInteger(m.data?.gif) && m.data.gif >= 0 && m.data.gif < 16 && {
+      icon: 'bookmark', label: isGifSaved(m.data.gif) ? 'حذف از گیف‌های من' : 'افزودن به گیف‌های من',
+      onClick: () => toggleSavedGif(m.data.gif),
+    },
     canPin && { icon: 'pin', label: m.pinned ? 'برداشتن سنجاق' : 'سنجاق کردن', onClick: () => pinMessage(m, !m.pinned) },
     { icon: 'forward', label: 'بازارسال', onClick: () => openModal({ type: 'forward', chatId: c.id, ids: [m.id] }) },
     c.type !== 'saved' && { icon: 'bookmark', label: 'ذخیره در پیام‌های ذخیره‌شده', onClick: () => { const s = [...getState().chats.values()].find((x) => x.type === 'saved'); if (s) forwardMessages(c.id, [m.id], [s.id]); } },

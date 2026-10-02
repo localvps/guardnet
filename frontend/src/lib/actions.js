@@ -59,6 +59,7 @@ export const DEFAULT_SETTINGS = {
   readReceipts: true, lastSeenPrivacy: 'all', photoPrivacy: 'all', callsPrivacy: 'all', groupsPrivacy: 'all',
   forwardsPrivacy: 'all', archivedChats: false, messageFontSize: 16, bubbleMaxWidth: 780,
   showOnlineStatus: true, typingIndicator: true, linkPreview: true, voicePlaybackSpeed: 1,
+  savedGifs: [],
 };
 export const settings = () => ({ ...DEFAULT_SETTINGS, ...(getState().me?.settings || {}) });
 
@@ -106,6 +107,23 @@ export function setSetting(k, v) {
       applySettings();
     }
   }, 350);
+}
+
+/* ------------------------------------------------------------------ saved GIFs */
+export function isGifSaved(gifIndex) {
+  const s = settings();
+  return Array.isArray(s.savedGifs) && s.savedGifs.includes(gifIndex);
+}
+export function toggleSavedGif(gifIndex) {
+  const s = settings();
+  const saved = Array.isArray(s.savedGifs) ? s.savedGifs : [];
+  if (saved.includes(gifIndex)) {
+    setSetting('savedGifs', saved.filter((g) => g !== gifIndex));
+    toast('گیف از مجموعه حذف شد.', 'ok');
+  } else {
+    setSetting('savedGifs', [gifIndex, ...saved].slice(0, 200));
+    toast('گیف به مجموعه اضافه شد.', 'ok');
+  }
 }
 
 /* ------------------------------------------------------------------ session */

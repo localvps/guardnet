@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/turnserver.conf:ro
+    environment:
+      - TURN_PUBLIC_IP=${TURN_PUBLIC_IP:-}
+      - TURN_REALM=${TURN_REALM:-guardnet.local}
+      - TURN_USER=${TURN_USER:-guardnet}
+      - TURN_PASSWORD=${TURN_PASSWORD:-changeme}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

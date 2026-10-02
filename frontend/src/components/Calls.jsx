@@ -4,10 +4,53 @@ import { wsSend, setCallEventHook, setEndCallHook, userName, openPrivate } from 
 import { ring, stopRing, sound } from '../lib/sound.js';
 import { cx, fmtDur } from '../lib/format.jsx';
 import { Avatar, Icon } from './ui.jsx';
+import { api } from '../lib/api.js';
 
-const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+// Default STUN; will be replaced with TURN config from backend if available
+let ICE_CONFIG = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+let ICE_POLICY = 'all';
+
+async function loadIceConfig() {
+  try {
+    const r = await api('/calls/ice');
+    if (r?.iceServers?.length) {
+      ICE_CONFIG = r.iceServers;
+      ICE_POLICY = r.iceTransportPolicy || 'all';
+    }
+  } catch { /* fall back to STUN */ }
+}
+loadIceConfig();
+
+// High-quality audio constraints
+const AUDIO_C = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1, sampleRate: 48000 };
+// High-quality video constraints
+const VIDEO_C = { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 30, max: 30 }, facingMode: 'user' };
+
+// Set sender parameters for better quality
+async function tuneSenders(pc) {
+  for (const s of pc.getSenders()) {
+    if (s.track?.kind === 'video') {
+      try {
+        const p = s.getParameters();
+        if (!p.encodings) p.encodings = [{}];
+        p.encodings[0].maxBitrate = 2000000;
+        p.encodings[0].maxFramerate = 30;
+        await s.setParameters(p);
+      } catch { /* */ }
+    }
+    if (s.track?.kind === 'audio') {
+      try {
+        const p = s.getParameters();
+        if (!p.encodings) p.encodings = [{}];
+        p.encodings[0].maxBitrate = 64000;
+        await s.setParameters(p);
+      } catch { /* */ }
+    }
+  }
+}
+
 // Runtime objects live outside React state
-const rt = { pc: null, local: null, remote: null, pendingIce: [], screen: null };
+const rt = { pc: null, local: null, remote: null, pendingIce: [], screen: null, reconnectTimer: null };
 
 const patch = (p) => { const c = getState().call; if (c) setState({ call: { ...c, ...p } }); };
 
@@ -15,7 +58,9 @@ export async function startCall(user, video) {
   if (getState().call) { toast('در حال حاضر یک تماس فعال دارید.', 'error'); return; }
   if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) { toast('مرورگر شما از تماس پشتیبانی نمی‌کند.', 'error'); return; }
   setState({ call: { phase: 'requesting', peer: user, video, out: true, muted: false, cam: video, min: false } });
-  try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: video ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false }); } catch {
+  try {
+    rt.local = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_C, video: video ? VIDEO_C : false });
+  } catch {
     setState({ call: null }); toast(video ? 'دسترسی به دوربین یا میکروفون داده نشد.' : 'دسترسی به میکروفون داده نشد.', 'error'); return;
   }
   patch({ phase: 'calling' });
@@ -24,25 +69,41 @@ export async function startCall(user, video) {
 }
 
 function makePc(id) {
-  const pc = new RTCPeerConnection({ iceServers: ICE });
+  const pc = new RTCPeerConnection({ iceServers: ICE_CONFIG, iceTransportPolicy: ICE_POLICY });
   rt.pc = pc; rt.pendingIce = [];
   rt.remote = new MediaStream();
   rt.local?.getTracks().forEach((t) => pc.addTrack(t, rt.local));
+  tuneSenders(pc);
   pc.ontrack = (e) => { e.streams[0]?.getTracks().forEach((t) => { if (!rt.remote.getTracks().includes(t)) rt.remote.addTrack(t); }); patch({ remoteTick: Date.now() }); };
   pc.onicecandidate = (e) => { if (e.candidate) wsSend('call:ice', { call_id: id, cand: e.candidate.toJSON() }); };
   pc.onconnectionstatechange = () => {
     const s = pc.connectionState;
     if (s === 'connected') { const c = getState().call; if (c && c.phase !== 'active') { patch({ phase: 'active', since: Date.now() }); stopRing(); } }
     else if (s === 'failed') { toast('اتصال تماس برقرار نشد (شبکه یا فایروال).', 'error'); hangup(); }
-    else if (s === 'disconnected') patch({ weak: true });
+    else if (s === 'disconnected') {
+      patch({ weak: true });
+      // Attempt ICE restart after 3s if still disconnected
+      if (rt.reconnectTimer) clearTimeout(rt.reconnectTimer);
+      rt.reconnectTimer = setTimeout(() => {
+        if (rt.pc && pc.connectionState === 'disconnected') {
+          try { pc.restartIce(); } catch { /* */ }
+        }
+      }, 3000);
+    } else if (s === 'connecting' || s === 'connected') {
+      if (rt.reconnectTimer) { clearTimeout(rt.reconnectTimer); rt.reconnectTimer = null; }
+    }
   };
-  pc.oniceconnectionstatechange = () => { if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') patch({ weak: false }); };
+  pc.oniceconnectionstatechange = () => {
+    if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') patch({ weak: false });
+    else if (pc.iceConnectionState === 'failed') { toast('اتصال ICE ناموفق بود.', 'error'); hangup(); }
+  };
   return pc;
 }
 async function flushIce() { for (const c of rt.pendingIce.splice(0)) { try { await rt.pc.addIceCandidate(c); } catch { /* */ } } }
 
 function cleanup(status) {
   stopRing();
+  if (rt.reconnectTimer) { clearTimeout(rt.reconnectTimer); rt.reconnectTimer = null; }
   rt.pc?.close(); rt.pc = null;
   rt.local?.getTracks().forEach((t) => t.stop()); rt.local = null;
   rt.screen?.getTracks().forEach((t) => t.stop()); rt.screen = null;
@@ -66,7 +127,7 @@ async function accept() {
   const c = getState().call; if (!c || c.phase !== 'incoming') return;
   stopRing();
   patch({ phase: 'connecting' });
-  try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: c.video }); } catch {
+  try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_C, video: c.video ? VIDEO_C : false }); } catch {
     try { rt.local = await navigator.mediaDevices.getUserMedia({ audio: true }); patch({ cam: false }); toast('دوربین در دسترس نیست؛ تماس صوتی برقرار می‌شود.'); } catch { toast('دسترسی به میکروفون داده نشد.', 'error'); wsSend('call:decline', { call_id: c.id }); cleanup(); return; }
   }
   makePc(c.id);

@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import Sticker from './Sticker.jsx';
-import { settings, setSetting } from '../lib/actions.js';
+import { settings, setSetting, isGifSaved, toggleSavedGif } from '../lib/actions.js';
 import { cx } from '../lib/format.jsx';
 import { Icon, useDismiss } from './ui.jsx';
 import { stickerSrc } from './Sticker.jsx';
+import { useStore } from '../lib/store.js';
 
 const CATS = [
   ['smile', 'شکلک‌ها', '😀😃😄😁😆😅🤣😂🙂🙃😉😊😇🥰😍🤩😘😗😚😙😋😛😜🤪😝🤑🤗🤭🤫🤔🤐🤨😐😑😶😏😒🙄😬🤥😌😔😪🤤😴😷🤒🤕🤢🤮🥵🥶🥴😵🤯🤠🥳😎🤓🧐😕😟🙁😮😯😲😳🥺😦😧😨😰😥😢😭😱😖😣😞😓😩😫🥱😤😡😠🤬😈👿💀☠️💩🤡👹👺👻👽👾🤖'],
@@ -28,6 +29,7 @@ export default function EmojiPanel({ onEmoji, onSticker, onGif, onClose }) {
   const [cat, setCat] = useState(0);
   const [pack, setPack] = useState(1);
   const [preview, setPreview] = useState(null);
+  const savedGifs = useStore((s) => s.me?.settings?.savedGifs || []);
   const ref = useRef(null);
   useDismiss(ref, onClose, true, '.composer-wrap, .ctx-layer, .modal-layer');
   const recent = settings().recentEmoji || [];
@@ -73,11 +75,40 @@ export default function EmojiPanel({ onEmoji, onSticker, onGif, onClose }) {
         </>
       )}
       {tab === 'gif' && (
-        <div className="ep-gifs scroll">
-          {Array.from({ length: GIF_COUNT }, (_, i) => <button key={i} type="button" aria-label={`ارسال گیف ${i + 1}`} onClick={() => onGif({ gif: i })}>
-            <video src={`/gifs/${i}.webm`} poster={`/gifs/${i}.webp`} autoPlay loop muted playsInline preload="none" aria-hidden="true" /><span>GIF</span>
-          </button>)}
-        </div>
+        <>
+          {(() => {
+            const saved = savedGifs;
+            return saved.length > 0 && (
+              <>
+                <div className="ep-gif-saved-head">
+                  <Icon name="bookmark" /><span>گیف‌های من</span>
+                  <button type="button" className="ep-gif-clear" onClick={() => { setSetting('savedGifs', []); }}>پاک کردن همه</button>
+                </div>
+                <div className="ep-gifs ep-gifs-saved scroll">
+                  {saved.map((g) => (
+                    <button key={`s${g}`} type="button" aria-label={`ارسال گیف ذخیره‌شده ${g + 1}`} className="ep-gif-item" onClick={() => onGif({ gif: g })}
+                      onContextMenu={(e) => { e.preventDefault(); toggleSavedGif(g); }}>
+                      <video src={`/gifs/${g}.webm`} poster={`/gifs/${g}.webp`} autoPlay loop muted playsInline preload="none" aria-hidden="true" />
+                      <span className="ep-gif-badge" title="حذف از گیف‌های من" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSavedGif(g); }}><Icon name="x" /></span>
+                      <span className="ep-gif-tag">GIF</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="ep-gif-divider"><span>گیف‌های پیشنهادی</span></div>
+              </>
+            );
+          })()}
+          <div className="ep-gifs scroll">
+            {Array.from({ length: GIF_COUNT }, (_, i) => (
+              <button key={i} type="button" aria-label={`ارسال گیف ${i + 1}`} className={cx('ep-gif-item', isGifSaved(i) && 'saved')} onClick={() => onGif({ gif: i })}
+                onContextMenu={(e) => { e.preventDefault(); toggleSavedGif(i); }}>
+                <video src={`/gifs/${i}.webm`} poster={`/gifs/${i}.webp`} autoPlay loop muted playsInline preload="none" aria-hidden="true" />
+                <span className="ep-gif-badge" title={isGifSaved(i) ? 'حذف از گیف‌های من' : 'افزودن به گیف‌های من'} onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSavedGif(i); }}><Icon name={isGifSaved(i) ? 'check' : 'plus'} /></span>
+                <span className="ep-gif-tag">GIF</span>
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

@@ -314,6 +314,38 @@
 .msg.out .v-speed { background: rgba(255, 255, 255, .16); color: inherit; }
 [data-theme='light'] .msg.out .v-speed { background: rgba(79, 174, 78, .16); color: #2f7d32; }
 
+/* audio file player (music) */
+.b-audio { display: flex; align-items: center; gap: 12px; min-width: min(300px, 68vw); max-width: min(380px, 88vw); padding: 4px 2px; }
+.af-play { width: 48px; height: 48px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; transition: transform var(--t-fast); cursor: pointer; }
+.af-play:active { transform: scale(.93); }
+.af-play .ic { width: 24px; height: 24px; }
+.msg.out .af-play { background: rgba(255, 255, 255, .92); color: var(--accent); }
+[data-theme='light'] .msg.out .af-play { background: #4fae4e; color: #fff; }
+.af-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.af-info { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.af-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.af-meta { font-size: 12px; color: var(--meta-in); white-space: nowrap; }
+.msg.out .af-meta { color: var(--meta-out); }
+.af-wave { position: relative; height: 24px; cursor: pointer; direction: ltr; display: flex; align-items: center; }
+.af-wave::before { content: ''; position: absolute; inset: 0; border-radius: 6px; background: color-mix(in srgb, currentColor 14%, transparent); }
+.af-progress { position: absolute; inset-block: 0; right: 0; border-radius: 6px; background: var(--accent); opacity: .9; transition: width .15s linear; }
+.msg.out .af-progress { background: currentColor; opacity: .5; }
+.af-thumb { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); transform: translate(50%, -50%); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); transition: right .15s linear; }
+.msg.out .af-thumb { background: currentColor; }
+.af-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.af-time { font-size: 12px; color: var(--meta-in); font-variant-numeric: tabular-nums; }
+.msg.out .af-time { color: var(--meta-out); }
+.af-dl { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--meta-in); transition: background var(--t-fast); }
+.af-dl:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+.msg.out .af-dl { color: var(--meta-out); }
+
+@media (max-width: 380px) {
+  .b-audio { min-width: min(240px, 80vw); }
+  .af-play { width: 42px; height: 42px; }
+  .af-play .ic { width: 20px; height: 20px; }
+  .af-title { font-size: 13px; }
+}
+
 /* poll */
 .t-poll, .t-location, .t-contact, .t-gif { padding-bottom: 24px; }
 .b-poll { padding: 2px 2px 0; }
@@ -602,11 +634,34 @@
 .st-grid .lock { position: absolute; bottom: 6px; inset-inline-end: 6px; width: 22px; height: 22px; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; display: grid; place-items: center; }
 .st-grid .lock .ic { width: 12px; height: 12px; }
 .ep-gifs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 112px; gap: 6px; align-content: start; }
-.ep-gifs button { position: relative; display: block; width: 100%; height: 112px; border-radius: 14px; overflow: hidden; background: var(--surface); }
-.ep-gifs button video { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ep-gifs button span { position: absolute; bottom: 6px; inset-inline-start: 6px; border-radius: 5px; padding: 2px 5px; background: rgba(0, 0, 0, .62); color: #fff; font-size: 10px; font-weight: 800; }
-.ep-gifs button:hover { outline: 2px solid var(--accent); }
-.ep-gifs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ep-gifs button, .ep-gif-item { position: relative; display: block; width: 100%; height: 112px; border-radius: 14px; overflow: hidden; background: var(--surface); cursor: pointer; }
+.ep-gifs button video, .ep-gif-item video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ep-gifs button span, .ep-gif-tag { position: absolute; bottom: 6px; inset-inline-start: 6px; border-radius: 5px; padding: 2px 5px; background: rgba(0, 0, 0, .62); color: #fff; font-size: 10px; font-weight: 800; }
+.ep-gifs button:hover, .ep-gif-item:hover { outline: 2px solid var(--accent); }
+.ep-gifs button:focus-visible, .ep-gif-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* saved GIFs section */
+.ep-gif-saved-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px 6px; font-size: 14px; font-weight: 700; color: var(--accent); }
+.ep-gif-saved-head .ic { width: 18px; height: 18px; }
+.ep-gif-saved-head span { flex: 1; }
+.ep-gif-clear { font-size: 12px; color: var(--text-2); padding: 4px 8px; border-radius: 8px; transition: background var(--t-fast); }
+.ep-gif-clear:hover { background: var(--hover); color: var(--danger); }
+.ep-gifs-saved { grid-auto-rows: 100px; }
+.ep-gifs-saved .ep-gif-item { height: 100px; }
+.ep-gif-divider { display: flex; align-items: center; gap: 10px; padding: 8px 12px 4px; }
+.ep-gif-divider::before, .ep-gif-divider::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.ep-gif-divider span { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.ep-gif-badge { position: absolute !important; top: 6px !important; inset-inline-end: 6px !important; bottom: auto !important; inset-inline-start: auto !important; width: 24px; height: 24px; border-radius: 50%; background: rgba(0, 0, 0, .6); color: #fff; display: grid !important; place-items: center; padding: 0 !important; font-size: 0 !important; opacity: 0; transition: opacity var(--t-fast); z-index: 2; }
+.ep-gif-item:hover .ep-gif-badge { opacity: 1; }
+.ep-gif-badge .ic { width: 14px; height: 14px; }
+.ep-gif-item.saved .ep-gif-badge { opacity: 1; background: var(--accent); }
+.ep-gif-item.saved .ep-gif-badge .ic { color: #fff; }
+
+@media (max-width: 380px) {
+  .ep-gifs { grid-auto-rows: 90px; }
+  .ep-gifs button, .ep-gif-item { height: 90px; }
+  .ep-gifs-saved .ep-gif-item { height: 80px; }
+}
 
 /* ---------- bubble style variants ---------- */
 [data-bubble-style='glass'] .bubble {

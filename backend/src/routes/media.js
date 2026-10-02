@@ -174,3 +174,20 @@ calls.delete('/', h((req) => {
   run('DELETE FROM calls WHERE caller=? OR callee=?', u.id, u.id);
   return { ok: true };
 }));
+
+// ICE/TURN configuration for WebRTC calls
+calls.get('/ice', h((req) => {
+  auth(req); // require auth
+  const stunUrls = process.env.WEBRTC_STUN_URLS || 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302';
+  const turnUrls = process.env.WEBRTC_TURN_URLS || '';
+  const turnUser = process.env.WEBRTC_TURN_USER || '';
+  const turnPass = process.env.WEBRTC_TURN_PASS || '';
+  const forceTurn = process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
+
+  const iceServers = [];
+  if (stunUrls) iceServers.push({ urls: stunUrls.split(',').map((s) => s.trim()).filter(Boolean) });
+  if (turnUrls && turnUser && turnPass) {
+    iceServers.push({ urls: turnUrls.split(',').map((s) => s.trim()).filter(Boolean), username: turnUser, credential: turnPass });
+  }
+  return { iceServers, iceTransportPolicy: forceTurn ? 'relay' : 'all' };
+}));
