@@ -209,7 +209,7 @@ function Voice({ m, out }) {
         <button type="button" className="v-speed" onClick={cycleSpeed} aria-label="سرعت پخش">{st.speed}×</button>
       </div>
       {!m.pending && <audio ref={a} src={assetUrl(d.url)} preload="none" onPlay={() => setSt((s) => ({ ...s, play: true }))} onPause={() => setSt((s) => ({ ...s, play: false }))}
-        onEnded={() => setSt((s) => ({ ...s, play: false, t: 0 }))} onTimeUpdate={(e) => setSt((s) => ({ ...s, t: e.currentTarget.currentTime }))} />}
+        onEnded={() => setSt((s) => ({ ...s, play: false, t: 0 }))} onTimeUpdate={() => { const el = a.current; if (el) setSt((s) => ({ ...s, t: el.currentTime })); }} />}
     </div>
   );
 }
@@ -386,8 +386,8 @@ function AudioFileBox({ m }) {
         onPlay={() => setSt((s) => ({ ...s, play: true }))}
         onPause={() => setSt((s) => ({ ...s, play: false }))}
         onEnded={() => setSt((s) => ({ ...s, play: false, t: 0 }))}
-        onTimeUpdate={(e) => setSt((s) => ({ ...s, t: e.currentTarget.currentTime }))}
-        onLoadedMetadata={(e) => setSt((s) => ({ ...s, dur: e.currentTarget.duration || 0 }))} />}
+        onTimeUpdate={() => { const el = a.current; if (el) setSt((s) => ({ ...s, t: el.currentTime })); }}
+        onLoadedMetadata={() => { const el = a.current; const du = el && el.duration; setSt((s) => ({ ...s, dur: Number.isFinite(du) ? du : 0 })); }} />}
     </div>
   );
 }
