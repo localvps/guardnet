@@ -68,7 +68,7 @@ export function privatePeer(c, uid) {
 /** SQL fragment (uid is always an integer from the DB, never user input). */
 export const vis = (uid) => {
   const u = Number.parseInt(uid, 10) | 0;
-  return ` AND m.deleted=0 AND (m.expires_at IS NULL OR m.expires_at > ${Date.now()}) AND (m.sched_at IS NULL OR m.sender_id=${u}) AND NOT EXISTS(SELECT 1 FROM hidden h WHERE h.msg_id=m.id AND h.user_id=${u})`;
+  return ` AND m.deleted=0 AND (m.expires_at IS NULL OR m.expires_at > (CAST(strftime('%s','now') AS INTEGER) * 1000)) AND (m.sched_at IS NULL OR m.sender_id=${u}) AND NOT EXISTS(SELECT 1 FROM hidden h WHERE h.msg_id=m.id AND h.user_id=${u})`;
 };
 
 export function msgPreview(m) {

@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { q, q1, qv, ex, run, now } from './db.js';
 import { hub } from './realtime/hub.js';
 import { COLORS, DEFAULT_PRIVACY, OFFICIAL_USERNAME, BOT_USERNAME } from './config.js';
-import { getOrCreatePrivate, deliverMessage, insertMessage, rowUser, isPremium, releaseScheduled } from './domain.js';
+import { getOrCreatePrivate, deliverMessage, insertMessage, rowUser, isPremium, releaseScheduled, pushChat } from './domain.js';
 
 function ensureSystem() {
   const list = [
@@ -96,9 +96,11 @@ export function startScheduler() {
       const expired = q('SELECT id, chat_id FROM messages WHERE expires_at IS NOT NULL AND expires_at<=? AND deleted=0', t);
       for (const r of expired) {
         run('UPDATE messages SET deleted=1 WHERE id=?', r.id);
-        for (const m of q('SELECT user_id FROM members WHERE chat_id=? AND left=0', r.chat_id)) {
+        const mids = q('SELECT user_id FROM members WHERE chat_id=? AND left=0', r.chat_id);
+        for (const m of mids) {
           if (hub.online(m.user_id)) hub.send(m.user_id, 'message:delete', { chat_id: r.chat_id, ids: [r.id] });
         }
+        pushChat(r.chat_id);
       }
       run('DELETE FROM stories WHERE expires_at<?', t);
       run("DELETE FROM qr_logins WHERE expires_at<? AND status<>'approved'", t - 60e3);

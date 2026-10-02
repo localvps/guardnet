@@ -50,7 +50,7 @@ function Message({ m, c, first, last, flash, hl }) {
         <Body m={m} c={c} out={out} emojiN={emojiN} hl={hl} />
         {Object.keys(m.reactions || {}).length > 0 && <Reactions m={m} c={c} />}
         <Meta m={m} out={out} read={out && peerRead != null && peerRead >= m.id} channel={c.type === 'channel'} overlay={media || bare} />
-        {m.ttl && <TtlTimer m={m} />}
+        {m.ttl > 0 && <TtlTimer m={m} />}
       </div>
     </div>
   );
@@ -207,7 +207,7 @@ function Voice({ m, out }) {
         <button type="button" className="v-speed" onClick={cycleSpeed} aria-label="سرعت پخش">{st.speed}×</button>
       </div>
       {!m.pending && <audio ref={a} src={assetUrl(d.url)} preload="none" onPlay={() => setSt((s) => ({ ...s, play: true }))} onPause={() => setSt((s) => ({ ...s, play: false }))}
-        onEnded={() => setSt({ play: false, t: 0 })} onTimeUpdate={(e) => setSt((s) => ({ ...s, t: e.currentTarget.currentTime }))} />}
+        onEnded={() => setSt((s) => ({ ...s, play: false, t: 0 }))} onTimeUpdate={(e) => setSt((s) => ({ ...s, t: e.currentTarget.currentTime }))} />}
     </div>
   );
 }

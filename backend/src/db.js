@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS messages(
   id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id INTEGER REFERENCES chats(id) ON DELETE CASCADE, sender_id INTEGER,
   type TEXT, text TEXT DEFAULT '', data TEXT DEFAULT '{}', reply_to INTEGER, fwd TEXT,
   created_at INTEGER, edited_at INTEGER, deleted INTEGER DEFAULT 0, pinned INTEGER DEFAULT 0,
-  sched_at INTEGER, silent INTEGER DEFAULT 0);
+  sched_at INTEGER, silent INTEGER DEFAULT 0, ttl INTEGER DEFAULT 0, expires_at INTEGER);
 CREATE INDEX IF NOT EXISTS idx_msg_chat ON messages(chat_id, id);
 CREATE INDEX IF NOT EXISTS idx_msg_sched ON messages(sched_at);
 CREATE TABLE IF NOT EXISTS hidden(msg_id INTEGER, user_id INTEGER, PRIMARY KEY(msg_id, user_id));
