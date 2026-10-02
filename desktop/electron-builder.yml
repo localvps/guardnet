@@ -1,0 +1,51 @@
+appId: ir.guardnet.desktop
+productName: GuardNet
+copyright: GuardNet
+asar: true
+compression: maximum
+electronLanguages:
+  - fa-IR
+  - en-US
+directories:
+  output: dist-desktop
+  buildResources: build
+files:
+  - main.js
+  - preload.js
+  - package.json
+# nativeImage cannot read from inside app.asar, so the window/taskbar artwork has
+# to be unpacked next to the executable.
+extraResources:
+  - from: build/icon.ico
+    to: icon.ico
+  - from: build/tray.png
+    to: tray.png
+win:
+  icon: build/icon.ico
+  verifyUpdateCodeSignature: false
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+    - target: portable
+      arch:
+        - x64
+        - ia32
+nsis:
+  # Per-user, no UAC: Windows 7 machines in the wild are usually standard
+  # accounts and an elevated installer is the #1 reason an install "fails".
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  unicode: true
+  menuCategory: false
+  runAfterFinish: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: GuardNet
+  deleteAppDataOnUninstall: false
+  artifactName: GuardNet-Setup-${version}-${arch}.${ext}
+portable:
+  artifactName: GuardNet-Portable-${version}-${arch}.${ext}
+publish: null

@@ -1,0 +1,21 @@
+{
+  "name": "guardnet",
+  "productName": "GuardNet",
+  "version": "1.0.0",
+  "description": "GuardNet messenger - Windows desktop client (Windows 7 SP1 through Windows 11, 32-bit and 64-bit)",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "author": "GuardNet",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "pack": "electron-builder --win --x64 --ia32 --publish never",
+    "pack:x64": "electron-builder --win --x64 --publish never",
+    "pack:ia32": "electron-builder --win --ia32 --publish never"
+  },
+  "devDependencies": {
+    "electron": "21.4.4",
+    "electron-builder": "^26.0.12"
+  }
+}
