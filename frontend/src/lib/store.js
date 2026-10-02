@@ -53,6 +53,7 @@ function shallow(a, b) {
   if (Object.is(a, b)) return true;
   if (typeof a !== 'object' || typeof b !== 'object' || !a || !b || Array.isArray(a) !== Array.isArray(b)) return false;
   if (a instanceof Map || b instanceof Map) return false;
+  if (a instanceof Set || b instanceof Set) return false;
   const ka = Object.keys(a); const kb = Object.keys(b);
   if (ka.length !== kb.length) return false;
   return ka.every((k) => Object.is(a[k], b[k]));
