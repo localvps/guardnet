@@ -60,6 +60,15 @@ export const plural = (n, word) => `${fa(n)} ${word}`;
 /* ------------------------------------------------------------------ safe rich text → React */
 const TOKEN = /(```[\s\S]+?```|`[^`\n]+`|\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|\|\|[^|\n]+\|\||https?:\/\/[^\s<>"']+[^\s<>"'.,!?؟،:;)\]]|@[A-Za-z][A-Za-z0-9_]{3,31}|#[\p{L}\p{N}_]{2,40}|\/[a-z]{2,20}\b)/gu;
 
+/** Only allow http/https URLs — blocks javascript:, data:, file: etc. */
+function safeUrl(u) {
+  try {
+    const url = new URL(u);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+  } catch { /* invalid */ }
+  return null;
+}
+
 export function RichText({ text, onMention, onHashtag, onCommand, highlight }) {
   const out = [];
   const src = String(text || '');
@@ -82,7 +91,7 @@ export function RichText({ text, onMention, onHashtag, onCommand, highlight }) {
     else if (t.startsWith('__')) out.push(<i key={k++}>{t.slice(2, -2)}</i>);
     else if (t.startsWith('~~')) out.push(<s key={k++}>{t.slice(2, -2)}</s>);
     else if (t.startsWith('||')) out.push(<Spoiler key={k++} text={t.slice(2, -2)} />);
-    else if (t.startsWith('http')) out.push(<a key={k++} href={t} target="_blank" rel="noopener noreferrer nofollow" dir="ltr" onClick={(e) => e.stopPropagation()}>{t.length > 60 ? t.slice(0, 57) + '…' : t}</a>);
+    else if (t.startsWith('http')) { const safe = safeUrl(t); if (safe) out.push(<a key={k++} href={safe} target="_blank" rel="noopener noreferrer nofollow" dir="ltr" onClick={(e) => e.stopPropagation()}>{t.length > 60 ? t.slice(0, 57) + '…' : t}</a>); else out.push(<Fragment key={k++}>{t}</Fragment>); }
     else if (t.startsWith('@')) out.push(<a key={k++} className="mention" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onMention?.(t.slice(1)); }} href="#" dir="ltr">{t}</a>);
     else if (t.startsWith('#')) out.push(<a key={k++} className="mention" href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onHashtag?.(t); }}>{t}</a>);
     else if (t.startsWith('/') && onCommand) out.push(<a key={k++} className="mention" href="#" dir="ltr" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCommand(t); }}>{t}</a>);

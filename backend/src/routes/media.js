@@ -81,6 +81,7 @@ export function serveFile(req, res) {
   const top = (f.mime || '').split('/')[0];
   const inline = ['image', 'video', 'audio'].includes(top) && f.mime !== 'image/svg+xml';
   res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; media-src 'self'; sandbox");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
   res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`);
   res.type(inline ? f.mime : 'application/octet-stream');

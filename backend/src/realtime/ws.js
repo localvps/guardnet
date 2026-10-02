@@ -105,7 +105,7 @@ export function attachWs(server) {
         let msg; try { msg = JSON.parse(String(raw)); } catch { return; }
         const ev = typeof msg?.ev === 'string' ? msg.ev : ''; const d = msg?.d && typeof msg.d === 'object' ? msg.d : {};
         if (ev === 'ping') { try { ws.send('{"ev":"pong","d":{}}'); } catch { /* */ } return; }
-        if (!rateHit(`ws:${u.id}`, 300, 10e3)) return;
+        if (!rateHit(`ws:${u.id}`, 200, 10e3)) return;
         try {
           if (ev === 'typing') {
             const cid = Number.parseInt(d.chat_id, 10) || 0; const c = rowChat(cid);

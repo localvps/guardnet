@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { q, q1, ex, run, now, likeEsc } from '../db.js';
 import { h, body, str, int, auth } from '../lib/http.js';
-import { err, rateHit } from '../lib/security.js';
+import { err, rateHit, safeFileName } from '../lib/security.js';
 import { sec } from '../lib/settings.js';
 import { PREMIUM_STICKERS, STICKER_PACK_SIZES, GIF_COUNT, MSG_TYPES } from '../config.js';
 import {
@@ -78,6 +78,42 @@ chatScoped.get('/:cid/media', h((req) => {
 }));
 
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
+
+/* ------------------------------------------------------------------ spam detection */
+const recentMsgs = new Map(); // `${uid}:${cid}` -> { text, at, count }
+const SPAM_WINDOW = 10e3; // 10 seconds
+const SPAM_DUP_LIMIT = 5; // max same text repeats in window
+const SPAM_BURST_LIMIT = 8; // max messages in short burst
+const SPAM_BURST_WINDOW = 3e3; // 3 second burst window
+const burstBuckets = new Map(); // `${uid}` -> [timestamps]
+
+/** Checks for duplicate messages and burst flooding. Returns error message or null. */
+function spamCheck(uid, cid, text) {
+  const t = Date.now();
+  const key = `${uid}:${cid}`;
+  // Burst: too many messages in very short time
+  let burst = burstBuckets.get(uid);
+  if (!burst) { burst = []; burstBuckets.set(uid, burst); }
+  while (burst.length && t - burst[0] > SPAM_BURST_WINDOW) burst.shift();
+  if (burst.length >= SPAM_BURST_LIMIT) return 'پیام‌های زیادی در زمان کوتاه ارسال کردید؛ کمی صبر کنید.';
+  burst.push(t);
+  // Duplicate detection (same text to same chat within window)
+  if (text && text.trim()) {
+    const norm = text.trim().toLowerCase().slice(0, 100);
+    let entry = recentMsgs.get(key);
+    if (!entry || t - entry.at > SPAM_WINDOW) { entry = { text: norm, at: t, count: 1 }; recentMsgs.set(key, entry); }
+    else if (entry.text === norm) { entry.count++; if (entry.count >= SPAM_DUP_LIMIT) return 'تکرار یک پیام زیاد است؛ متن را تغییر دهید.'; }
+    else { entry.text = norm; entry.at = t; entry.count = 1; }
+  }
+  return null;
+}
+// Cleanup stale entries periodically
+setInterval(() => {
+  const t = Date.now();
+  for (const [k, v] of recentMsgs) if (t - v.at > SPAM_WINDOW * 6) recentMsgs.delete(k);
+  for (const [k, arr] of burstBuckets) if (!arr.length || t - arr[arr.length - 1] > 60000) burstBuckets.delete(k);
+}, 30000).unref();
+
 function validatePayload(u, type, text, data) {
   if (!MSG_TYPES.has(type)) err(400, 'نوع پیام نامعتبر است.');
   if ([...text].length > 4096) err(400, 'متن پیام حداکثر ۴۰۹۶ نویسه است.');
@@ -88,7 +124,7 @@ function validatePayload(u, type, text, data) {
     if (!f) err(400, 'فایل پیوست یافت نشد.');
     if (f.owner !== u.id) err(403, 'دسترسی به فایل ندارید.');
     if (f.size > limits(u).upload) err(403, 'حجم فایل از سقف مجاز بیشتر است.');
-    clean = { file: f.id, url: fileUrl(f.id), name: f.name, size: f.size, mime: f.mime };
+    clean = { file: f.id, url: fileUrl(f.id), name: safeFileName(f.name), size: f.size, mime: f.mime };
     for (const k of ['w', 'h', 'dur']) if (num(data[k])) clean[k] = Math.max(0, Math.min(1e6, data[k]));
     if (type === 'voice' && Array.isArray(data.wave)) clean.wave = data.wave.slice(0, 64).map((x) => Math.round(Math.max(0, Math.min(1, +x || 0)) * 100) / 100);
     if (data.spoiler) clean.spoiler = true;
@@ -142,6 +178,9 @@ chatScoped.post('/:cid/messages', h((req) => {
   if (!rateHit(`msg:${u.id}`, sec().message_rate_per_min, 60e3)) err(429, 'پیام‌های زیادی فرستادید؛ چند لحظه صبر کنید.');
   const b = body(req);
   const type = str(b.type || 'text', 20); const text = str(b.text, 20000);
+  // Anti-spam: burst + duplicate detection
+  const spam = spamCheck(u.id, cid, text);
+  if (spam) err(429, spam);
   const data = validatePayload(u, type, text, b.data);
   if (c.type === 'private') {
     const peer = privatePeer(c, u.id);
@@ -179,6 +218,7 @@ chatScoped.post('/:cid/messages', h((req) => {
 
 router.post('/forward', h((req) => {
   const u = auth(req); const b = body(req);
+  if (!rateHit(`fwd:${u.id}`, 20, 60e3)) err(429, 'بازارسال‌های زیادی در مدت کوتاه؛ کمی صبر کنید.');
   const src = int(b.from_chat);
   const { c: sc } = requireMember(src, u.id);
   const ids = (Array.isArray(b.ids) ? b.ids : []).map((x) => int(x)).filter(Boolean).slice(0, 100);
@@ -262,6 +302,7 @@ router.patch('/:mid', h((req) => {
 
 router.post('/:mid/react', h((req) => {
   const u = auth(req); const mid = int(req.params.mid);
+  if (!rateHit(`react:${u.id}`, 30, 60e3)) err(429, 'واکنش‌های زیادی در مدت کوتاه؛ کمی صبر کنید.');
   const { m, c, mem } = ownMsg(mid, u.id);
   if (!mem) err(403, 'برای واکنش ابتدا عضو شوید.');
   const e = str(body(req).emoji, 16);
@@ -289,6 +330,7 @@ router.post('/:mid/pin', h((req) => {
 
 router.post('/:mid/vote', h((req) => {
   const u = auth(req); const mid = int(req.params.mid);
+  if (!rateHit(`vote:${u.id}`, 30, 60e3)) err(429, 'رأی‌های زیادی در مدت کوتاه؛ کمی صبر کنید.');
   const { m, c, mem } = ownMsg(mid, u.id);
   if (!mem) err(403, 'برای رأی دادن ابتدا عضو شوید.');
   if (m.type !== 'poll') err(400, 'این پیام نظرسنجی نیست.');

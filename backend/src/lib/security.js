@@ -139,6 +139,25 @@ export function deviceName(ua = '') {
   return o ? `${b} · ${o}` : b;
 }
 
+/* ------------------------------------------------------------------ input sanitization */
+const HTML_ENTITIES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+/** Strips HTML tags and neutralizes HTML entities. Use for user-provided display text. */
+export function sanitizeText(s, max = 1000) {
+  return String(s ?? '').slice(0, max).replace(/[&<>"']/g, (c) => HTML_ENTITIES[c]).trim();
+}
+/** Validates a URL scheme — only http/https allowed, blocks javascript:/data:/file: etc. */
+export function safeUrl(u) {
+  try {
+    const url = new URL(String(u || ''));
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.href;
+  } catch { /* fallthrough */ }
+  return null;
+}
+/** Sanitizes a filename: strips path separators, null bytes, control chars. */
+export function safeFileName(s, max = 200) {
+  return String(s ?? '').replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, '').replace(/[\/\\:*?"<>|]/g, '_').slice(0, max).trim() || 'file';
+}
+
 /* ------------------------------------------------------------------ in-memory sliding-window rate limiter */
 const buckets = new Map();
 export function rateHit(key, limit, windowMs) {
