@@ -1,6 +1,6 @@
 # =====================================================================
 #  GuardNet TURN/STUN - the ONLY WebRTC server for this deployment.
-#  Self-hosted on xxxxxx (YOUR_PUBLIC_IP). No third-party dependency:
+#  Self-hosted on xxxxxx. No third-party dependency:
 #  no Google STUN, no Cloudflare STUN, no public TURN.
 # =====================================================================
 

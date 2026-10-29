@@ -10,7 +10,7 @@ import { api } from '../lib/api.js';
 // STUN and TURN, so calls keep working on a fully national network with no
 // Google/Cloudflare STUN and no third-party TURN. Hardcoded to our own relay
 // so a slow /calls/ice response can never downgrade a call to host candidates.
-let ICE_CONFIG = [{ urls: 'stun:YOUR_PUBLIC_IP:3478' }];
+let ICE_CONFIG = [{ urls: 'stun:xxxxxx:3478' }];
 let ICE_POLICY = 'all';
 let ICE_TURN = false;
 let iceReady = null;
