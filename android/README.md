@@ -99,7 +99,7 @@ keytool -genkeypair -v -keystore keystore/guardnet-upload.jks -storetype PKCS12 
 
 ## امنیت
 
-- فقط `https://xxxxxx` داخل WebView باز می‌شود؛ بقیه‌ی لینک‌ها به مرورگر یا
+- فقط `` داخل WebView باز می‌شود؛ بقیه‌ی لینک‌ها به مرورگر یا
   برنامه‌ی مربوطه سیستم می‌روند.
 - `intent://` فقط به‌صورت یک لینک ساده‌ی `http(s)` به مرورگر داده می‌شود و
   component/extraهای آن دور ریخته می‌شوند (جلوگیری از intent injection).
