@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320" role="img" aria-label="GuardNet — self-hosted private messenger">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a0f16"/>
+      <stop offset=".45" stop-color="#0e1621"/>
+      <stop offset="1" stop-color="#101d2c"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#37aee2" stop-opacity=".38"/>
+      <stop offset="1" stop-color="#37aee2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#8b5cf6" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="logo" x1=".2" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#4fc0ee"/>
+      <stop offset="1" stop-color="#1e96c8"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#37aee2" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#37aee2" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#8b5cf6" stop-opacity="0"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity=".035" stroke-width="1"/>
+    </pattern>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="320" rx="20" fill="url(#bg)"/>
+  <rect width="1200" height="320" rx="20" fill="url(#grid)"/>
+  <ellipse cx="150" cy="40" rx="360" ry="220" fill="url(#glowA)"/>
+  <ellipse cx="1060" cy="290" rx="340" ry="200" fill="url(#glowB)"/>
+  <rect x="0.5" y="0.5" width="1199" height="319" rx="20" fill="none" stroke="#ffffff" stroke-opacity=".07"/>
+
+  <!-- logo -->
+  <circle cx="600" cy="88" r="60" fill="#37aee2" opacity=".35" filter="url(#soft)"/>
+  <circle cx="600" cy="88" r="52" fill="url(#logo)"/>
+  <circle cx="600" cy="88" r="52" fill="none" stroke="#ffffff" stroke-opacity=".22" stroke-width="1.5"/>
+  <g transform="translate(546 34) scale(1.6875)">
+    <path transform="translate(-1.5 1)" fill="#ffffff"
+      d="M13.5 31.2 47.6 18.1c1.6-.6 3 .4 2.5 2.8l-5.8 27.3c-.4 1.9-1.6 2.4-3.2 1.5l-8.8-6.5-4.2 4.1c-.5.5-.9.9-1.8.9l.6-9 16.4-14.8c.7-.6-.2-1-1.1-.4L20.5 38.2l-8.7-2.7c-1.9-.6-1.9-1.9 1.7-4.3Z"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="600" y="204" text-anchor="middle" fill="#f1f5f9"
+    font-family="'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif"
+    font-size="60" font-weight="700" letter-spacing="-1.6">GuardNet</text>
+  <rect x="470" y="226" width="260" height="2" rx="1" fill="url(#rule)"/>
+  <text x="600" y="258" text-anchor="middle" fill="#8b9bab"
+    font-family="'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif"
+    font-size="19" letter-spacing=".2">Self-hosted private messenger</text>
+
+  <!-- tech chips -->
+  <g font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="13" fill="#a7b6c6">
+    <g>
+      <rect x="366" y="272" width="84" height="24" rx="12" fill="#ffffff" fill-opacity=".05" stroke="#ffffff" stroke-opacity=".10"/>
+      <text x="408" y="288" text-anchor="middle">REST</text>
+    </g>
+    <g>
+      <rect x="458" y="272" width="112" height="24" rx="12" fill="#ffffff" fill-opacity=".05" stroke="#ffffff" stroke-opacity=".10"/>
+      <text x="514" y="288" text-anchor="middle">WebSocket</text>
+    </g>
+    <g>
+      <rect x="578" y="272" width="98" height="24" rx="12" fill="#ffffff" fill-opacity=".05" stroke="#ffffff" stroke-opacity=".10"/>
+      <text x="627" y="288" text-anchor="middle">WebRTC</text>
+    </g>
+    <g>
+      <rect x="684" y="272" width="90" height="24" rx="12" fill="#ffffff" fill-opacity=".05" stroke="#ffffff" stroke-opacity=".10"/>
+      <text x="729" y="288" text-anchor="middle">SQLite</text>
+    </g>
+  </g>
+</svg>
