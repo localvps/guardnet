@@ -48,9 +48,11 @@ function Viewer({ uid, groups }) {
   useEffect(() => {
     const k = (e) => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') next(); else if (e.key === 'ArrowRight') prev(); };
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
-  });
+  }); // deps intentionally omitted: the handlers read the current item index
   useEffect(() => { const v = vid.current; if (!v) return; if (paused || views) v.pause(); else v.play().catch(() => {}); }, [paused, views, item?.id]);
-  if (!g || !item) { setTimeout(close, 0); return null; }
+  // Closing during render is a React side effect warning; defer to the next tick.
+  useEffect(() => { if (!g || !item) close(); }, [g, item]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!g || !item) return null;
   const d = item.data || {};
   const react = async (e) => { try { await api(`/stories/${item.id}/view`, { method: 'POST', body: { reaction: e } }); toast(`واکنش ${e} ارسال شد.`, 'ok'); } catch (err) { toast(err.message, 'error'); } };
   const sendReply = async () => {

@@ -7,6 +7,7 @@ import { q, q1, ex, run, now } from '../db.js';
 import { h, body, str, int, auth } from '../lib/http.js';
 import { err, faNum } from '../lib/security.js';
 import { UPLOADS, CHUNK, MB } from '../config.js';
+import { sys } from '../lib/settings.js';
 import { J, userJson, rowUser, limits, isPremium, blocked, fileUrl } from '../domain.js';
 import { hub } from '../realtime/hub.js';
 
@@ -17,7 +18,7 @@ const fpath = (fid) => path.join(UPLOADS, fid);
 
 files.post('/', h((req) => {
   const u = auth(req); const b = body(req);
-  const size = int(b.size); const lim = limits(u).upload;
+  const size = int(b.size); const lim = Math.min(limits(u).upload, sys().max_upload_mb * MB);
   if (size <= 0) err(400, 'فایل خالی است.');
   if (size > lim) err(403, `حداکثر حجم فایل ${faNum(lim / MB)} مگابایت است.` + (isPremium(u) ? '' : ' با پریمیوم تا ۲۰۰ مگابایت.'));
   const pending = q1('SELECT COUNT(*) n FROM files WHERE owner=? AND done=0 AND created_at>?', u.id, now() - 3600e3).n;
@@ -201,7 +202,7 @@ calls.get('/ice', h((req) => {
   const turnUrls = process.env.WEBRTC_TURN_URLS || '';
   const turnUser = process.env.WEBRTC_TURN_USER || '';
   const turnPass = process.env.WEBRTC_TURN_PASS || '';
-  const forceTurn = process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
+  const forceTurn = sys().force_turn || process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
 
   const split = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
   const iceServers = [];

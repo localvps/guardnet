@@ -6,11 +6,10 @@ import { cx, fmtDur } from '../lib/format.jsx';
 import { Avatar, Icon } from './ui.jsx';
 import { api } from '../lib/api.js';
 
-// Self-hosted ICE only. The backend serves our own coturn (xxxxxx) as both
-// STUN and TURN, so calls keep working on a fully national network with no
-// Google/Cloudflare STUN and no third-party TURN. Hardcoded to our own relay
-// so a slow /calls/ice response can never downgrade a call to host candidates.
-let ICE_CONFIG = [{ urls: 'stun:xxxxxx:3478' }];
+// Browser-side fallback before /calls/ice answers. The backend supplies the real
+// STUN/TURN list (WEBRTC_STUN_URLS / WEBRTC_TURN_URLS); this is only so the first
+// seconds of a call have somewhere to gather from if that request is slow.
+let ICE_CONFIG = [{ urls: 'stun:stun.cloudflare.com:3478' }];
 let ICE_POLICY = 'all';
 let ICE_TURN = false;
 let iceReady = null;
@@ -237,7 +236,7 @@ function cleanup(status) {
 export function hangup() {
   const c = getState().call; if (!c) return;
   if (c.id) wsSend(c.phase === 'incoming' ? 'call:decline' : 'call:hangup', { call_id: c.id });
-  cleanup(c.id ? null : null);
+  cleanup();
 }
 setEndCallHook(() => cleanup());
 
@@ -376,8 +375,6 @@ async function toggleScreen() {
         await reoffer();
       }
     }
-    rt.local?.getTracks().forEach((t) => { if (!t.isLive || t.readyState === 'ended') rt.local.removeTrack(t); });
-    rt.local?.getTracks().forEach((t) => { if (!t.isLive || t.readyState === 'ended') rt.local.removeTrack(t); });
     if (rt.screenMic) {
       const as = sender('audio');
       if (as) await as.replaceTrack(rt.screenMic.track);

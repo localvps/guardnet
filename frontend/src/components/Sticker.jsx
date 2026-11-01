@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { assetUrl } from '../lib/api.js';
 
 const sizes = { 1: 94, 2: 100, 3: 88 };
 const motion = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -14,7 +15,7 @@ function updatePlayers() {
 export function stickerSrc(id) {
   const m = typeof id === 'string' && /^([123]):(0|[1-9]\d{0,2})$/.exec(id);
   if (!m || Number(m[2]) >= sizes[m[1]]) return null;
-  return `/stickers/${m[1]}/${m[2]}.${m[1] === '2' ? 'tgs' : 'webp'}`;
+  return assetUrl(`/stickers/${m[1]}/${m[2]}.${m[1] === '2' ? 'tgs' : 'webp'}`);
 }
 
 export default function Sticker({ id, className = '' }) {

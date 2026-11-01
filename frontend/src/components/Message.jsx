@@ -107,7 +107,7 @@ function Body({ m, c, out, emojiN, hl }) {
     case 'voice': return <Voice m={m} out={out} />;
     case 'sticker': return <div className={cx('b-sticker', d.sticker && 'image', d.premium && 'premium')}>{d.sticker ? <Sticker id={d.sticker} /> : d.e}</div>;
     case 'gif': return d.gif != null
-      ? <div className="b-gif real"><img src={Number.isInteger(d.gif) && d.gif >= 0 && d.gif < 16 ? `/gifs/${d.gif}.gif` : undefined} alt="گیف" loading="lazy" draggable="false" /><em>GIF</em></div>
+      ? <div className="b-gif real"><img src={Number.isInteger(d.gif) && d.gif >= 0 && d.gif < 16 ? assetUrl(`/gifs/${d.gif}.gif`) : undefined} alt="گیف" loading="lazy" draggable="false" /><em>GIF</em></div>
       : <div className="b-gif" style={{ background: `linear-gradient(135deg, ${d.bg?.[0] || '#4f8cff'}, ${d.bg?.[1] || '#8b5cf6'})` }}><span>{d.t}</span><em>GIF</em></div>;
     case 'poll': return <Poll m={m} c={c} out={out} />;
     case 'location': return <Location d={d} />;
@@ -256,24 +256,16 @@ function Poll({ m, c, out }) {
 }
 
 function Location({ d }) {
-  const z = 15; const n = 2 ** z;
-  const x = ((d.lng + 180) / 360) * n;
-  const lat = (d.lat * Math.PI) / 180;
-  const y = ((1 - Math.log(Math.tan(lat) + 1 / Math.cos(lat)) / Math.PI) / 2) * n;
-  const tx = Math.floor(x); const ty = Math.floor(y);
-  const fx = x - tx; const fy = y - ty;
-  const tiles = [];
-  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) tiles.push({ i, j, src: `https://tile.openstreetmap.org/${z}/${tx + i}/${ty + j}.png` });
-  const href = `https://www.openstreetmap.org/?mlat=${d.lat}&mlon=${d.lng}#map=16/${d.lat}/${d.lng}`;
+  // Tiles from tile.openstreetmap.org are blocked by the app's CSP (img-src 'self' data: blob:),
+  // so the preview is drawn locally and the link opens the real map.
+  const lat = Number(d.lat); const lng = Number(d.lng);
+  const href = Number.isFinite(lat) && Number.isFinite(lng) ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}` : 'https://www.openstreetmap.org/';
   return (
     <a className="b-loc" href={href} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
       <div className="loc-map">
-        <div className="loc-tiles" style={{ transform: `translate(calc(50% - ${(1 + fx) * 256}px), calc(50% - ${(1 + fy) * 256}px))` }} dir="ltr">
-          {tiles.map((t) => <img key={`${t.i}${t.j}`} src={t.src} alt="" style={{ left: (t.i + 1) * 256, top: (t.j + 1) * 256 }} loading="lazy" referrerPolicy="no-referrer" />)}
-        </div>
         <span className="loc-pin"><Icon name="mapPin" /></span>
       </div>
-      <div className="loc-cap"><b>{d.name || 'موقعیت مکانی'}</b><span dir="ltr">{d.lat.toFixed(5)}, {d.lng.toFixed(5)}{d.acc ? ` ±${d.acc}m` : ''}</span></div>
+      <div className="loc-cap"><b>{d.name || 'موقعیت مکانی'}</b><span dir="ltr">{Number.isFinite(lat) ? `${lat.toFixed(5)}, ${lng.toFixed(5)}${d.acc ? ` ±${d.acc}m` : ''}` : ''}</span></div>
     </a>
   );
 }

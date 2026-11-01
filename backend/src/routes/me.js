@@ -40,7 +40,7 @@ router.patch('/me', h((req) => {
     const fid = b.avatar ? str(b.avatar, 40) : null;
     if (fid) {
       const f = q1('SELECT * FROM files WHERE id=? AND owner=? AND done=1', fid, u.id);
-      if (!f || !/^image\/(png|jpe?g|webp|gif)$/.test(f.mime || '')) err(400, 'فایل تصویر نامعتبر است.');
+      if (!f || !/^image\/(png|jpe?g|webp|gif|avif|heic|bmp)$/.test(f.mime || '')) err(400, 'فایل تصویر نامعتبر است.');
     }
     sets.push('avatar=?'); args.push(fid);
   }

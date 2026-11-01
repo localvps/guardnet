@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { cx } from '../lib/format.jsx';
 
 /**
@@ -8,11 +8,20 @@ import { cx } from '../lib/format.jsx';
  */
 export default function Monkey({ mode = 'idle', progress = 0, size = 160 }) {
   const [blink, setBlink] = useState(false);
+  // Every instance gets its own gradient/clip ids: duplicate ids make url(#mk-head) resolve to
+  // whichever SVG rendered first, so a second mascot silently borrows the first one's paint.
+  const uid = 'mk' + useId().replace(/[^\w-]/g, '');
+  const id = (n) => `${uid}-${n}`;
   useEffect(() => {
-    let t;
-    const loop = () => { t = setTimeout(() => { setBlink(true); setTimeout(() => setBlink(false), 140); loop(); }, 2600 + Math.random() * 2600); };
+    let t, b;
+    const loop = () => {
+      t = setTimeout(() => {
+        setBlink(true);
+        b = setTimeout(() => { setBlink(false); loop(); }, 140);
+      }, 2600 + Math.random() * 2600);
+    };
     loop();
-    return () => clearTimeout(t);
+    return () => { clearTimeout(t); clearTimeout(b); };
   }, []);
   const p = Math.max(0, Math.min(1, progress));
   // RTL page but the typed text is LTR: caret moves left → right
@@ -23,30 +32,30 @@ export default function Monkey({ mode = 'idle', progress = 0, size = 160 }) {
   return (
     <svg className={cx('monkey', `m-${mode}`)} width={size} height={size} viewBox="0 0 160 160" aria-hidden="true">
       <defs>
-        <radialGradient id="mk-head" cx=".45" cy=".35" r=".75">
+        <radialGradient id={id('head')} cx=".45" cy=".35" r=".75">
           <stop offset="0" stopColor="#c98a52" /><stop offset="1" stopColor="#9a5f31" />
         </radialGradient>
-        <radialGradient id="mk-face" cx=".5" cy=".35" r=".8">
+        <radialGradient id={id('face')} cx=".5" cy=".35" r=".8">
           <stop offset="0" stopColor="#ffe2bd" /><stop offset="1" stopColor="#f1c08b" />
         </radialGradient>
-        <radialGradient id="mk-paw" cx=".4" cy=".3" r=".8">
+        <radialGradient id={id('paw')} cx=".4" cy=".3" r=".8">
           <stop offset="0" stopColor="#c07f47" /><stop offset="1" stopColor="#8e552a" />
         </radialGradient>
-        <clipPath id="mk-clip"><circle cx="80" cy="80" r="80" /></clipPath>
+        <clipPath id={id('clip')}><circle cx="80" cy="80" r="80" /></clipPath>
       </defs>
-      <g clipPath="url(#mk-clip)">
+      <g clipPath={`url(#${id('clip')})`}>
         <circle cx="80" cy="80" r="80" className="mk-bg" />
         <g className="mk-headgrp" style={{ transform: `rotate(${tilt}deg)` }}>
           {/* ears */}
-          <circle cx="27" cy="82" r="17" fill="url(#mk-head)" />
-          <circle cx="133" cy="82" r="17" fill="url(#mk-head)" />
+          <circle cx="27" cy="82" r="17" fill={`url(#${id('head')})`} />
+          <circle cx="133" cy="82" r="17" fill={`url(#${id('head')})`} />
           <circle cx="28" cy="82" r="9.5" fill="#f1b983" />
           <circle cx="132" cy="82" r="9.5" fill="#f1b983" />
           {/* head */}
-          <ellipse cx="80" cy="80" rx="52" ry="50" fill="url(#mk-head)" />
+          <ellipse cx="80" cy="80" rx="52" ry="50" fill={`url(#${id('head')})`} />
           <path d="M66 32c4-6 10-8 14-8s10 2 14 8c-5-2-9-2-14 2-5-4-9-4-14-2z" fill="#8a532a" opacity=".6" />
           {/* face mask */}
-          <path d="M80 60c-6-10-16-14-26-13-14 1-22 12-22 25 0 8 3 14 7 18-2 4-3 7-3 11 0 15 20 27 44 27s44-12 44-27c0-4-1-7-3-11 4-4 7-10 7-18 0-13-8-24-22-25-10-1-20 3-26 13z" fill="url(#mk-face)" />
+          <path d="M80 60c-6-10-16-14-26-13-14 1-22 12-22 25 0 8 3 14 7 18-2 4-3 7-3 11 0 15 20 27 44 27s44-12 44-27c0-4-1-7-3-11 4-4 7-10 7-18 0-13-8-24-22-25-10-1-20 3-26 13z" fill={`url(#${id('face')})`} />
           {/* eyes */}
           <g className="mk-eyes" style={{ transform: `translate(${ex}px, ${ey}px)` }}>
             <g className={cx('mk-eye', blink && !covered && 'blink')} style={{ transformOrigin: '63px 76px' }}>
@@ -73,26 +82,26 @@ export default function Monkey({ mode = 'idle', progress = 0, size = 160 }) {
         </g>
         {/* paws */}
         <g className="mk-paw mk-paw-l" style={{ transform: covered ? 'translate(0,0) rotate(0)' : 'translate(-10px, 96px) rotate(-18deg)' }}>
-          <Paw cx={60} cy={78} flip={false} />
+          <Paw cx={60} cy={78} flip={false} paw={`url(#${id('paw')})`} />
         </g>
         <g className="mk-paw mk-paw-r" style={{ transform: mode === 'close' ? 'translate(0,0) rotate(0)' : mode === 'peek' ? 'translate(4px, 17px) rotate(8deg)' : 'translate(10px, 96px) rotate(18deg)' }}>
-          <Paw cx={100} cy={78} flip />
+          <Paw cx={100} cy={78} flip paw={`url(#${id('paw')})`} />
         </g>
       </g>
     </svg>
   );
 }
 
-function Paw({ cx, cy, flip }) {
+function Paw({ cx, cy, flip, paw }) {
   const s = flip ? -1 : 1;
   return (
     <g>
-      <path d={`M${cx - 24 * s} ${cy + 60} C ${cx - 26 * s} ${cy + 30}, ${cx - 20 * s} ${cy + 14}, ${cx - 8 * s} ${cy + 10}`} stroke="url(#mk-paw)" strokeWidth="16" strokeLinecap="round" fill="none" />
-      <ellipse cx={cx} cy={cy} rx="21" ry="17" fill="url(#mk-paw)" />
-      <ellipse cx={cx - 12} cy={cy - 12} rx="6.5" ry="8" fill="url(#mk-paw)" />
-      <ellipse cx={cx - 1} cy={cy - 16} rx="6.5" ry="8.5" fill="url(#mk-paw)" />
-      <ellipse cx={cx + 10} cy={cy - 13} rx="6.5" ry="8" fill="url(#mk-paw)" />
-      <ellipse cx={cx + (flip ? -17 : 17)} cy={cy - 3} rx="5.5" ry="7" fill="url(#mk-paw)" />
+      <path d={`M${cx - 24 * s} ${cy + 60} C ${cx - 26 * s} ${cy + 30}, ${cx - 20 * s} ${cy + 14}, ${cx - 8 * s} ${cy + 10}`} stroke={paw} strokeWidth="16" strokeLinecap="round" fill="none" />
+      <ellipse cx={cx} cy={cy} rx="21" ry="17" fill={paw} />
+      <ellipse cx={cx - 12} cy={cy - 12} rx="6.5" ry="8" fill={paw} />
+      <ellipse cx={cx - 1} cy={cy - 16} rx="6.5" ry="8.5" fill={paw} />
+      <ellipse cx={cx + 10} cy={cy - 13} rx="6.5" ry="8" fill={paw} />
+      <ellipse cx={cx + (flip ? -17 : 17)} cy={cy - 3} rx="5.5" ry="7" fill={paw} />
       <ellipse cx={cx} cy={cy + 2} rx="11" ry="8" fill="#e9b07a" opacity=".55" />
     </g>
   );

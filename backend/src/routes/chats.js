@@ -132,6 +132,7 @@ router.post('/:cid/invite/reset', h((req) => {
 }));
 
 export function joinChat(c, u) {
+  if (c.frozen) err(403, 'این گفتگو توسط مدیریت GuardNet مسدود شده است.');
   if (member(c.id, u.id)) return;
   if (q1('SELECT 1 FROM members WHERE chat_id=? AND user_id=?', c.id, u.id))
     run("UPDATE members SET left=0, role='member', joined_at=? WHERE chat_id=? AND user_id=?", now(), c.id, u.id);
@@ -145,15 +146,19 @@ export function joinChat(c, u) {
 router.post('/:cid/join', h((req) => {
   const u = auth(req); const c = rowChat(int(req.params.cid));
   if (!c || !c.is_public) err(404, 'گفتگوی عمومی یافت نشد.');
+  if (c.frozen) err(403, 'این گفتگو توسط مدیریت GuardNet مسدود شده است.');
   joinChat(c, u);
   return chatJson(c, u.id);
 }));
 
 router.post('/:cid/members', h((req) => {
   const u = auth(req); const cid = int(req.params.cid);
-  const c0 = rowChat(cid);
-  const { c } = requireMember(cid, u.id, c0?.type === 'channel');
+  // Adding members is an admin action in both groups and channels: an ordinary member must not be
+  // able to pull up to 100 strangers into a chat.
+  // Only owners/admins may pull members in — a plain member could otherwise add 100 users.
+  const { c } = requireMember(cid, u.id, true);
   if (!['group', 'channel'].includes(c.type)) err(400, 'نامعتبر');
+  if (c.frozen) err(403, 'این گفتگو توسط مدیریت GuardNet مسدود شده است.');
   const added = []; let skipped = 0;
   for (const x of (Array.isArray(body(req).user_ids) ? body(req).user_ids : []).slice(0, 100)) {
     const t = rowUser(int(x));

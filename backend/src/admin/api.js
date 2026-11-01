@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import { q, q1, qv, ex, run, now, likeEsc, tx } from '../db.js';
 import { h, body, str, int } from '../lib/http.js';
 import { err, hashPassword, faNum } from '../lib/security.js';
-import { sec, updateSec, invalidateIps } from '../lib/settings.js';
+import { sec, updateSec, invalidateIps, sys, invalidateSys, SYS_DEFAULTS } from '../lib/settings.js';
 import { DB_PATH, UPLOADS } from '../config.js';
 import { hub, adminHub } from '../realtime/hub.js';
 import { J, rowUser, rowChat, isPremium, fileUrl, chatMemberIds, msgPreview, broadcastUser, presenceChanged, pushChat, userJson } from '../domain.js';
@@ -522,14 +523,14 @@ router.post('/bulk-action', SUPER_RE, h((req) => {
 }));
 
 /* ------------------------------------------------------------------ system settings */
-const sysDefaults = { maintenance: false, maintenance_msg: '', registrations: true, guest_read: true, max_upload_mb: 100, message_rate: 30, turn_configured: false };
+const sysDefaults = { ...SYS_DEFAULTS, turn_configured: false };
 router.get('/system-settings', V, h(() => {
   const row = q1('SELECT v FROM kv WHERE k=?', 'system_settings');
   const s = row ? J(row.v, sysDefaults) : { ...sysDefaults };
   s.turn_configured = !!(process.env.WEBRTC_TURN_URLS && process.env.WEBRTC_TURN_USER);
   s.turn_urls = process.env.WEBRTC_TURN_URLS || '';
   s.turn_user = process.env.WEBRTC_TURN_USER || '';
-  s.force_turn = process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
+  s.force_turn = s.force_turn || process.env.WEBRTC_FORCE_TURN === '1' || process.env.WEBRTC_FORCE_TURN === 'true';
   return s;
 }));
 router.patch('/system-settings', SUPER_RE, h((req) => {
@@ -539,10 +540,12 @@ router.patch('/system-settings', SUPER_RE, h((req) => {
   if (typeof b.maintenance === 'boolean') s.maintenance = b.maintenance;
   if (typeof b.maintenance_msg === 'string') s.maintenance_msg = str(b.maintenance_msg, 500).slice(0, 500);
   if (typeof b.registrations === 'boolean') s.registrations = b.registrations;
-  if (typeof b.guest_read === 'boolean') s.guest_read = b.guest_read;
+  if (typeof b.force_turn === 'boolean') s.force_turn = b.force_turn;
+  delete s.guest_read; // no guest-read path exists in the API — drop the stale key
   if (typeof b.max_upload_mb === 'number') s.max_upload_mb = Math.min(Math.max(b.max_upload_mb, 1), 500);
   if (typeof b.message_rate === 'number') s.message_rate = Math.min(Math.max(b.message_rate, 5), 120);
   ex('INSERT OR REPLACE INTO kv(k,v) VALUES(?,?)', 'system_settings', JSON.stringify(s));
+  invalidateSys();
   audit(req, 'system.settings', JSON.stringify(Object.keys(b)), s);
   return { ok: true, settings: s };
 }));
@@ -563,9 +566,11 @@ router.get('/media', V, h((req) => {
   return { items, total, page: p, size };
 }));
 router.delete('/media/:id', SUPER, h((req) => {
-  const f = q1('SELECT * FROM files WHERE id=?', int(req.params.id));
+  const fid = str(req.params.id, 40);
+  if (!/^[0-9a-f]{32}$/.test(fid)) err(404, 'فایل یافت نشد.');
+  const f = q1('SELECT * FROM files WHERE id=?', fid);
   if (!f) err(404, 'فایل یافت نشد.');
-  try { fs.unlinkSync(f.path); } catch { /* */ }
+  try { fs.unlinkSync(path.join(UPLOADS, fid)); } catch { /* already gone */ }
   run('DELETE FROM files WHERE id=?', f.id);
   audit(req, 'media.delete', `${f.id}`, { mime: f.mime, size: f.size });
   return { ok: true };

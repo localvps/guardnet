@@ -14,6 +14,21 @@ export function sec() {
   return cache;
 }
 
+/* ------------------------------------------------------------------ system settings (admin panel) */
+export const SYS_DEFAULTS = { maintenance: false, maintenance_msg: '', registrations: true, max_upload_mb: 100, message_rate: 30, force_turn: false };
+let sysCache = null;
+/** Operator-facing limits from the admin panel (kv.system_settings). Cached for 15 s. */
+export function sys() {
+  if (!sysCache) {
+    const s = { ...SYS_DEFAULTS };
+    try { Object.assign(s, JSON.parse(q1('SELECT v FROM kv WHERE k=?', 'system_settings')?.v || '{}')); } catch { /* corrupt row → defaults */ }
+    sysCache = s;
+  }
+  return sysCache;
+}
+export const invalidateSys = () => { sysCache = null; };
+setInterval(() => { sysCache = null; }, 15e3).unref();
+
 const RULES = {
   registration_open: (v) => typeof v === 'boolean',
   password_require_mix: (v) => typeof v === 'boolean',

@@ -383,9 +383,16 @@
 
 /* location */
 .b-loc { display: block; width: min(300px, 64vw); color: inherit; }
-.loc-map { position: relative; height: 150px; border-radius: calc(var(--br) - 6px); overflow: hidden; background: #aad3df; }
-.loc-tiles { position: absolute; top: 0; left: 0; width: 768px; height: 768px; }
-.loc-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; }
+.loc-map {
+  position: relative; height: 150px; border-radius: calc(var(--br) - 6px); overflow: hidden; background: #aad3df;
+  /* Static local map: remote tiles are blocked by CSP (img-src 'self'). */
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, .55) 2px, transparent 2px),
+    linear-gradient(rgba(255, 255, 255, .55) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(90, 150, 90, .30) 14px, transparent 14px),
+    linear-gradient(rgba(90, 150, 90, .30) 14px, transparent 14px);
+  background-size: 48px 48px, 48px 48px, 96px 96px, 96px 96px;
+}
 .loc-pin { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%); color: #e5484d; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .35)); }
 .loc-pin .ic { width: 34px; height: 34px; fill: currentColor; stroke: #fff; }
 .loc-cap { display: flex; flex-direction: column; padding: 6px 2px 0; line-height: 1.4; }

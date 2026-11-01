@@ -6,7 +6,7 @@ import {
   err, hashPassword, verifyPassword, passwordProblem, totpOk, randomToken, hashToken, encrypt, decrypt,
   clientIp, deviceName, rateHit, faNum,
 } from '../lib/security.js';
-import { sec, loginAttempt } from '../lib/settings.js';
+import { sec, sys, loginAttempt } from '../lib/settings.js';
 import { USERNAME_RE, DEFAULT_PRIVACY } from '../config.js';
 import { meJson, rowUser, getOrCreatePrivate, pickColor } from '../domain.js';
 import { systemMessage } from '../system.js';
@@ -63,6 +63,8 @@ router.post('/register', h(async (req) => {
   ipGuard(req, 'register', 6, 3600e3);
   const s = sec();
   if (!s.registration_open) err(403, 'ثبت‌نام حساب جدید در حال حاضر توسط مدیریت بسته شده است.');
+  const S = sys();
+  if (!S.registrations) err(403, 'ثبت‌نام حساب جدید توسط مدیریت بسته شده است.');
   const b = body(req);
   const username = cleanUser(b.username);
   const first = cleanName(b.first_name ?? b.name);
@@ -148,8 +150,12 @@ const shortCode = () => Array.from({ length: 8 }, () => CODE_ABC[crypto.randomIn
 router.post('/qr', h((req) => {
   ipGuard(req, 'qr', 40, 600e3);
   const tok = randomToken(24);
-  let code;
-  for (let i = 0; i < 5; i++) { code = shortCode(); if (!q1('SELECT 1 FROM qr_logins WHERE code=?', code)) break; }
+  // Retry until the code is actually free — the old loop fell through on the 5th try and the
+  // UNIQUE index then threw an uncaught 500.
+  const used = new Set(q('SELECT code FROM qr_logins WHERE expires_at>?', now()).map((r) => r.code));
+  let code = shortCode();
+  for (let i = 0; i < 20 && used.has(code); i++) code = shortCode();
+  if (used.has(code)) err(503, 'کد ورود در دسترس نیست؛ دوباره تلاش کنید.');
   ex('INSERT INTO qr_logins(token_hash,code,ip,ua,visitor,remember,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)',
     hashToken(tok), code, clientIp(req), str(req.headers['user-agent'], 300), req.headers['x-visitor-id'] || null,
     body(req).remember === false ? 0 : 1, now(), now() + QR_TTL);

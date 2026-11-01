@@ -244,37 +244,39 @@ function PhotoPicker({ photo, setPhoto }) {
 }
 
 /* ------------------------------------------------------------------ QR login (inline panel for desktop two-panel layout) */
-function QrLoginInline({ remember }) {
+/** Issue + poll + auto-refresh a QR login code. Shared by both the inline panel and the full page. */
+function useQrLogin(remember) {
   const [qr, setQr] = useState(null);
   const [err, setErr] = useState('');
   const [state, setState] = useState('loading');
-  const alive = useRef(true);
   const qrRef = useRef(null); qrRef.current = qr;
-
   useEffect(() => {
-    alive.current = true;
+    let alive = true;
     let poll; let refresh;
     const issue = async () => {
       try {
         const r = await api('/auth/qr', { method: 'POST', body: { remember } });
-        if (!alive.current) return;
+        if (!alive) return;
         setQr(r); setState('ready'); setErr('');
         clearTimeout(refresh); refresh = setTimeout(issue, Math.max(10e3, r.expires_in - 8e3));
-      } catch (e) { if (alive.current) { setErr(e.message); setState('error'); clearTimeout(refresh); refresh = setTimeout(issue, 5000); } }
+      } catch (e) { if (alive) { setErr(e.message); setState('error'); clearTimeout(refresh); refresh = setTimeout(issue, 5000); } }
     };
     issue();
     poll = setInterval(async () => {
       const cur = qrRef.current; if (!cur) return;
       try {
         const r = await api(`/auth/qr/${encodeURIComponent(cur.token)}`);
-        if (!alive.current) return;
+        if (!alive) return;
         if (r.status === 'approved') { clearInterval(poll); clearTimeout(refresh); setState('approved'); await startSession(r.token, r.me); }
       } catch { /* network hiccup */ }
     }, 1500);
-    return () => { alive.current = false; clearInterval(poll); clearTimeout(refresh); };
+    return () => { alive = false; clearInterval(poll); clearTimeout(refresh); };
   }, [remember]);
+  return { qr, err, state, link: qr ? `${location.origin}${location.pathname}#qr/${qr.token}` : '' };
+}
 
-  const link = qr ? `${location.origin}${location.pathname}#qr/${qr.token}` : '';
+function QrLoginInline({ remember }) {
+  const { qr, state, link } = useQrLogin(remember);
   return (
     <>
       <div className="qr-title">ورود سریع با QR</div>
@@ -299,34 +301,7 @@ function QrLoginInline({ remember }) {
 
 /* ------------------------------------------------------------------ QR login (full page, mobile fallback) */
 function QrLogin({ remember, onBack }) {
-  const [qr, setQr] = useState(null);
-  const [err, setErr] = useState('');
-  const [state, setState] = useState('loading');
-  const alive = useRef(true);
-  const qrRef = useRef(null); qrRef.current = qr;
-  useEffect(() => {
-    alive.current = true;
-    let poll; let refresh;
-    const issue = async () => {
-      try {
-        const r = await api('/auth/qr', { method: 'POST', body: { remember } });
-        if (!alive.current) return;
-        setQr(r); setState('ready'); setErr('');
-        clearTimeout(refresh); refresh = setTimeout(issue, Math.max(10e3, r.expires_in - 8e3));
-      } catch (e) { if (alive.current) { setErr(e.message); setState('error'); clearTimeout(refresh); refresh = setTimeout(issue, 5000); } }
-    };
-    issue();
-    poll = setInterval(async () => {
-      const cur = qrRef.current; if (!cur) return;
-      try {
-        const r = await api(`/auth/qr/${encodeURIComponent(cur.token)}`);
-        if (!alive.current) return;
-        if (r.status === 'approved') { clearInterval(poll); clearTimeout(refresh); setState('approved'); await startSession(r.token, r.me); }
-      } catch { /* network hiccup */ }
-    }, 1500);
-    return () => { alive.current = false; clearInterval(poll); clearTimeout(refresh); };
-  }, [remember]);
-  const link = qr ? `${location.origin}${location.pathname}#qr/${qr.token}` : '';
+  const { qr, err, state, link } = useQrLogin(remember);
   return (
     <div className="qr-page">
       <div className="qr-box">
