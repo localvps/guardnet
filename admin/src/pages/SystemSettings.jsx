@@ -30,13 +30,13 @@ export default function SystemSettings() {
           </div>
           {s.maintenance && <Field label="پیام حالت نگهداری" value={s.maintenance_msg} onChange={(v) => patch({ maintenance_msg: v })} maxLength={500} textarea rows={2} />}
         </div>
-        {s.maintenance && <div className="alert warn"><Icon name="alert" /><span>حالت نگهداری فعال است. کاربران جدید نمی‌توانند ثبت‌نام کنند.</span></div>}
+        {s.maintenance && <div className="alert warn"><Icon name="alert" /><span>حالت نگهداری فعال است. API برای همه کاربران با خطای ۵۰۳ پاسخ می‌دهد (پنل مدیریت باز است).</span></div>}
       </Card>
 
       <Card title="ثبت‌نام و دسترسی" icon="users">
         <div className="rows">
           <div className="row"><div className="row-body"><div className="row-title">ثبت‌نام کاربران جدید</div><div className="row-sub">اجازه ساخت حساب کاربری جدید</div></div><Toggle checked={s.registrations} disabled={busy} onChange={(v) => patch({ registrations: v })} /></div>
-          <div className="row"><div className="row-body"><div className="row-title">دسترسی مهمان به خواندن پیام‌ها</div><div className="row-sub">مشاهده پیام‌های عمومی بدون ورود</div></div><Toggle checked={s.guest_read} disabled={busy} onChange={(v) => patch({ guest_read: v })} /></div>
+          <div className="row"><div className="row-body"><div className="row-title">اجبار تماس‌ها به عبور از TURN</div><div className="row-sub">وقتی سرور TURN تنظیم شده باشد، همه ترافیک تماس از آن عبور می‌کند</div></div><Toggle checked={!!s.force_turn} disabled={busy} onChange={(v) => patch({ force_turn: v })} /></div>
         </div>
       </Card>
 
@@ -52,7 +52,6 @@ export default function SystemSettings() {
           <div className="row"><div className="row-body"><div className="row-title">سرور TURN</div><div className="row-sub">کانفیگ TURN برای تماس‌های صوتی و تصویری</div></div><Badge tone={s.turn_configured ? 'green' : 'muted'} icon={s.turn_configured ? 'check' : 'alert'}>{s.turn_configured ? 'فعال' : 'غیرفعال'}</Badge></div>
           {s.turn_urls && <div className="row"><div className="row-body"><div className="row-title">آدرس TURN</div><div className="row-sub" dir="ltr">{s.turn_urls}</div></div></div>}
           {s.turn_user && <div className="row"><div className="row-body"><div className="row-title">کاربر TURN</div><div className="row-sub" dir="ltr">{s.turn_user}</div></div></div>}
-          <div className="row"><div className="row-body"><div className="row-title">اجبار به عبور از TURN</div><div className="row-sub">همه ترافیک تماس از سرور TURN عبور کند</div></div><Toggle checked={s.force_turn} disabled={busy} onChange={(v) => patch({ force_turn: v })} /></div>
         </div>
         {!s.turn_configured && <div className="alert warn"><Icon name="alert" /><span>سرور TURN تنظیم نشده است. برای کیفیت بهتر تماس‌ها، یک سرور coturn با Docker راه‌اندازی کنید. راهنما در deploy/coturn/README.md</span></div>}
       </Card>

@@ -188,8 +188,7 @@ export function securityHeaders(req, res, next) {
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Permissions-Policy', 'geolocation=(self), camera=(self), microphone=(self), payment=()');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https')
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   res.removeHeader('X-Powered-By');
   next();
 }

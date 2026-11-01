@@ -12,7 +12,7 @@ export const userOf = (id) => getState().users.get(id) || (getState().me?.id ===
 export function userName(u) {
   if (!u) return 'کاربر';
   if (u.deleted) return 'حساب حذف‌شده';
-  return u.id === meId() ? u.name : u.name;
+  return u.name;
 }
 export function peerOf(c) { return c?.type === 'private' ? userOf(c.peer_id) : null; }
 export function chatTitle(c) {
@@ -400,8 +400,11 @@ export async function sendMessage(cid, { type = 'text', text = '', data = {}, re
 export async function sendFile(cid, file, { caption = '', reply_to, spoiler, kind, extra = {} } = {}) {
   const me = getState().me;
   const type = kind || (file.type.startsWith('image/') && !/svg|heic/.test(file.type) ? 'image' : file.type.startsWith('video/') ? 'video' : 'file');
-  if (file.size > (me.limits?.upload || 20 * 1024 * 1024)) {
-    toast(me.premium ? 'حجم فایل بیش از ۲۰۰ مگابایت است.' : 'حداکثر حجم فایل ۲۰ مگابایت است. با پریمیوم تا ۲۰۰ مگابایت.', 'error');
+  // The server enforces the real cap (min of the plan limit and the admin's max_upload_mb);
+  // this check only gives a fast, readable refusal before the upload starts.
+  const cap = me.limits?.upload || 20 * 1024 * 1024;
+  if (file.size > cap) {
+    toast(`حداکثر حجم فایل ${fa(Math.round(cap / 1048576))} مگابایت است.${me.premium ? '' : ' با پریمیوم تا ۲۰۰ مگابایت.'}`, 'error');
     return;
   }
   const local = URL.createObjectURL(file);
@@ -452,9 +455,15 @@ export async function editMessage(mid, text) {
 export async function deleteMessages(ids, forAll) {
   const real = ids.filter((x) => x > 0);
   const st = getState();
+  const gone = st.active ? (st.msgs.get(st.active)?.list || []).filter((m) => ids.includes(m.id)) : [];
   if (st.active) dropMsgs(st.active, ids);
   if (!real.length) return;
-  try { await api('/messages/delete', { method: 'POST', body: { ids: real, for_all: !!forAll } }); } catch (e) { toast(e.message, 'error'); }
+  try { await api('/messages/delete', { method: 'POST', body: { ids: real, for_all: !!forAll } }); }
+  catch (e) {
+    // The server refused: put the bubbles back so the UI does not claim a delete that didn't happen.
+    if (gone.length) setMsgs(st.active, (c) => ({ list: [...c.list.filter((m) => !ids.includes(m.id)), ...gone].sort((a, b) => a.id - b.id) }));
+    toast(e.message, 'error');
+  }
 }
 export async function react(m, emoji) {
   if (m.id < 0) return;
@@ -501,7 +510,9 @@ export async function loadStories() {
 
 /* ------------------------------------------------------------------ deep links: #@user  #join/CODE  #qr/TOKEN */
 export function handleDeepLink() {
-  const h = decodeURIComponent(location.hash.slice(1));
+  // A hand-typed hash such as "#%E0%A4%A" throws a URIError here and kills the whole boot.
+  let h = '';
+  try { h = decodeURIComponent(location.hash.slice(1)); } catch { h = ''; }
   if (!h) return;
   history.replaceState(null, '', location.pathname + location.search);
   if (h.startsWith('@')) resolveAndOpen(h.slice(1));

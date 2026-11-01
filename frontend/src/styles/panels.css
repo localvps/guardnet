@@ -268,6 +268,15 @@
 .picker-list { flex: 1; padding: 0 8px 8px; }
 .modal .picker-list { max-height: min(56dvh, 460px); }
 .picker-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; max-height: 120px; overflow-y: auto; }
+/* The "add members" search field is a bare <input> inside the chip row: without this it
+   renders as a 0-width black sliver at the row's start. */
+.picker-chips input {
+  flex: 1 1 180px; min-width: 0; height: 36px; padding: 0 12px;
+  border: 0; border-radius: 18px; background: var(--hover); color: var(--text);
+  font-size: 14.5px;
+}
+.picker-chips input::placeholder { color: var(--text-2); }
+.picker-chips input:focus { background: var(--surface-2); }
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
   height: 32px; padding: 0 12px;

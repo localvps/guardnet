@@ -4,6 +4,7 @@ import { settings, setSetting, isGifSaved, toggleSavedGif } from '../lib/actions
 import { cx } from '../lib/format.jsx';
 import { Icon, useDismiss } from './ui.jsx';
 import { stickerSrc } from './Sticker.jsx';
+import { assetUrl } from '../lib/api.js';
 import { useStore } from '../lib/store.js';
 
 const CATS = [
@@ -57,13 +58,13 @@ export default function EmojiPanel({ onEmoji, onSticker, onGif, onClose }) {
       {tab === 'sticker' && (
         <>
           <div className="st-packs" role="group" aria-label="مجموعه‌های استیکر">
-            {STICKER_PACKS.map((p) => <button key={p.id} type="button" className={cx(pack === p.id && 'active')} aria-label={`مجموعه استیکر ${p.id}`} aria-pressed={pack === p.id} onClick={() => { setPreview(null); setPack(p.id); }}><img src={`/stickers/${p.id}/0.webp`} alt="" /></button>)}
+            {STICKER_PACKS.map((p) => <button key={p.id} type="button" className={cx(pack === p.id && 'active')} aria-label={`مجموعه استیکر ${p.id}`} aria-pressed={pack === p.id} onClick={() => { setPreview(null); setPack(p.id); }}><img src={assetUrl(`/stickers/${p.id}/0.webp`)} alt="" /></button>)}
           </div>
           <div className="ep-stickers scroll" key={pack}>
             <div className="st-grid st-images">
               {Array.from({ length: STICKER_PACKS.find((p) => p.id === pack).count }, (_, i) => {
                 const id = `${pack}:${i}`;
-                const src = pack === 2 ? `/stickers/2/${i}.webp` : stickerSrc(id);
+                const src = pack === 2 ? assetUrl(`/stickers/2/${i}.webp`) : stickerSrc(id);
                 return <button key={id} type="button" aria-label={`ارسال استیکر ${i + 1} از مجموعه ${pack}`} onClick={() => onSticker({ sticker: id })}
                   onPointerEnter={(e) => { if (e.pointerType === 'mouse') setPreview(id); }} onPointerLeave={() => setPreview(null)} onFocus={() => setPreview(id)} onBlur={() => setPreview(null)}
                   onTouchStart={() => setPreview(id)}>
@@ -88,7 +89,7 @@ export default function EmojiPanel({ onEmoji, onSticker, onGif, onClose }) {
                   {saved.map((g) => (
                     <button key={`s${g}`} type="button" aria-label={`ارسال گیف ذخیره‌شده ${g + 1}`} className="ep-gif-item" onClick={() => onGif({ gif: g })}
                       onContextMenu={(e) => { e.preventDefault(); toggleSavedGif(g); }}>
-                      <video src={`/gifs/${g}.webm`} poster={`/gifs/${g}.webp`} autoPlay loop muted playsInline preload="none" aria-hidden="true" />
+                      <video src={assetUrl(`/gifs/${g}.webm`)} poster={assetUrl(`/gifs/${g}.webp`)} autoPlay loop muted playsInline preload="none" aria-hidden="true" />
                       <span className="ep-gif-badge" title="حذف از گیف‌های من" onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSavedGif(g); }}><Icon name="x" /></span>
                       <span className="ep-gif-tag">GIF</span>
                     </button>
@@ -102,7 +103,7 @@ export default function EmojiPanel({ onEmoji, onSticker, onGif, onClose }) {
             {Array.from({ length: GIF_COUNT }, (_, i) => (
               <button key={i} type="button" aria-label={`ارسال گیف ${i + 1}`} className={cx('ep-gif-item', isGifSaved(i) && 'saved')} onClick={() => onGif({ gif: i })}
                 onContextMenu={(e) => { e.preventDefault(); toggleSavedGif(i); }}>
-                <video src={`/gifs/${i}.webm`} poster={`/gifs/${i}.webp`} autoPlay loop muted playsInline preload="none" aria-hidden="true" />
+                <video src={assetUrl(`/gifs/${i}.webm`)} poster={assetUrl(`/gifs/${i}.webp`)} autoPlay loop muted playsInline preload="none" aria-hidden="true" />
                 <span className="ep-gif-badge" title={isGifSaved(i) ? 'حذف از گیف‌های من' : 'افزودن به گیف‌های من'} onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSavedGif(i); }}><Icon name={isGifSaved(i) ? 'check' : 'plus'} /></span>
                 <span className="ep-gif-tag">GIF</span>
               </button>

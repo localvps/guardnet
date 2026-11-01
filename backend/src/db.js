@@ -95,13 +95,21 @@ const prep = (sql) => {
   if (!s) { s = db.prepare(sql); cache.set(sql, s); }
   return s;
 };
+/** Separate cache for `.raw(true)` statements — statement objects are single-mode, so mutating
+ *  the shared cached statement would leak the raw flag into concurrent q()/q1() calls. */
+const rawCache = new Map();
+const prepRaw = (sql) => {
+  let s = rawCache.get(sql);
+  if (!s) { s = db.prepare(sql).raw(true); rawCache.set(sql, s); }
+  return s;
+};
 const norm = (args) => args.map((a) => (typeof a === 'boolean' ? (a ? 1 : 0) : a === undefined ? null : a));
 /** all rows */
 export const q = (sql, ...args) => prep(sql).all(...norm(args));
 /** first row */
 export const q1 = (sql, ...args) => prep(sql).get(...norm(args));
 /** scalar */
-export const qv = (sql, ...args) => { const r = prep(sql).raw(true).get(...norm(args)); prep(sql).raw(false); return r ? r[0] : undefined; };
+export const qv = (sql, ...args) => { const r = prepRaw(sql).get(...norm(args)); return r ? r[0] : undefined; };
 /** execute → lastInsertRowid */
 export const ex = (sql, ...args) => Number(prep(sql).run(...norm(args)).lastInsertRowid);
 export const run = (sql, ...args) => prep(sql).run(...norm(args)).changes;

@@ -21,6 +21,7 @@ export default function Composer({ c }) {
   const sendBtn = useRef(null);
   const attachBtn = useRef(null);
   const wrapRef = useRef(null);
+  const recRef = useRef(null); // live recorder — the `rec` state in the unmount closure is always stale
 
   useEffect(() => { if (edit) { setText(edit.text || ''); ta.current?.focus(); } }, [edit]);
   useEffect(() => { if (reply) ta.current?.focus(); }, [reply]);
@@ -115,17 +116,19 @@ export default function Composer({ c }) {
     const buf = new Uint8Array(an.fftSize);
     const started = Date.now();
     const state = { mr, stream, ac, chunks, peaks, started, level: 0, cancel: false };
+    // Typing while recording is announced once below; doing it every 100 ms floods the socket.
+    sendTyping(c.id, 'voice');
     const sample = setInterval(() => {
       an.getByteTimeDomainData(buf);
       let max = 0; for (const v of buf) max = Math.max(max, Math.abs(v - 128));
       const lv = Math.min(1, max / 90); peaks.push(lv);
       setRec((r) => (r ? { ...r, t: (Date.now() - started) / 1000, level: lv } : r));
-      sendTyping(c.id, 'voice');
     }, 100);
     state.sample = sample;
     mr.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
     mr.onstop = async () => {
       clearInterval(sample); stream.getTracks().forEach((t) => t.stop()); ac.close().catch(() => {});
+      recRef.current = null;
       sendTyping(c.id, 'voice', true);
       const dur = (Date.now() - started) / 1000;
       if (state.cancel || dur < 0.7) { setRec(null); if (!state.cancel) toast('برای ضبط، کمی بیشتر نگه دارید.'); return; }
@@ -140,10 +143,17 @@ export default function Composer({ c }) {
       await sendFile(c.id, file, { kind: 'voice', reply_to: r?.id, extra: { dur: Math.round(dur), wave } });
     };
     mr.start(250);
+    recRef.current = state;
     setRec({ t: 0, level: 0, state });
   }
   const stopRec = (cancel) => { if (!rec) return; rec.state.cancel = cancel; try { rec.state.mr.stop(); } catch { setRec(null); } };
-  useEffect(() => () => { if (rec) { rec.state.cancel = true; try { rec.state.mr.stop(); } catch { /* */ } } }, []); // eslint-disable-line
+  // Unmount: the render closure's `rec` is always null here, so read the ref the recorder was stored in.
+  useEffect(() => () => {
+    const st = recRef.current; if (!st) return;
+    st.cancel = true;
+    try { st.mr.stop(); } catch { st.stream.getTracks().forEach((t) => t.stop()); st.ac.close().catch(() => {}); }
+    recRef.current = null;
+  }, []);
 
   const mentionList = mention ? mentionCandidates(c, mention.q) : [];
   const hasText = !!text.trim();
@@ -219,6 +229,6 @@ function mentionCandidates(c, q) {
   const st = getState();
   const full = st.chatMembers?.get(c.id);
   const ids = full || [...new Set((st.msgs.get(c.id)?.list || []).map((m) => m.sender_id))];
-  return ids.map((id) => st.users.get(id)).filter((u) => u && u.id !== st.me.id && !u.deleted && u.username && (!q || u.username.toLowerCase().startsWith(q) || u.name.toLowerCase().includes(q))).slice(0, 6);
+  return ids.map((id) => st.users.get(id)).filter((u) => u && u.id !== st.me.id && !u.deleted && u.username && (!q || u.username.toLowerCase().startsWith(q) || (u.name || '').toLowerCase().includes(q))).slice(0, 6);
 }
 export { setSetting };

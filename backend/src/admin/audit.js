@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { q, q1, ex, now } from '../db.js';
 import { adminHub } from '../realtime/hub.js';
+import { clientIp } from '../lib/security.js';
 
 const digest = (prev, e) => crypto.createHash('sha256')
   .update([prev, e.admin_id, e.admin_name, e.action, e.target, e.detail, e.ip, e.at].map((x) => String(x ?? '')).join('\u241f'))
@@ -12,7 +13,7 @@ export function audit(req, action, target = '', detail = null) {
   const e = {
     admin_id: req?.admin?.id ?? null, admin_name: req?.admin?.username ?? req?.auditName ?? 'system',
     action, target: String(target ?? ''), detail: detail == null ? null : JSON.stringify(detail).slice(0, 4000),
-    ip: req ? (String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || '') : '', at: now(),
+    ip: req ? clientIp(req) : '', at: now(),
   };
   const hash = digest(prev, e);
   const id = ex('INSERT INTO audit_log(admin_id,admin_name,action,target,detail,ip,at,prev_hash,hash) VALUES(?,?,?,?,?,?,?,?,?)',

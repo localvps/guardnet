@@ -21,7 +21,7 @@ export function ContextMenu() {
     if (!ctx || !ref.current) { setPos(null); return; }
     const el = ref.current; const w = el.offsetWidth; const h = el.offsetHeight;
     const vw = window.innerWidth; const vh = window.innerHeight; const m = 8;
-    let left = ctx.anchorRight ? ctx.x - w : ctx.x - w; // RTL: open towards the left of the pointer
+    let left = ctx.x - w; // RTL: open towards the left of the pointer
     if (left < m) left = Math.min(ctx.x, vw - w - m);
     left = Math.max(m, Math.min(left, vw - w - m));
     let top = ctx.y;
@@ -107,11 +107,20 @@ export function Modal({ title, onClose, children, footer, className, wide, noPad
 
 /* ------------------------------------------------------------------ promise-based confirm / prompt */
 let resolver = null;
+/** A second dialog replaces the first, so the first promise must settle or its awaiter hangs forever. */
+function openDialog(d) {
+  const prev = resolver;
+  return new Promise((res) => {
+    resolver = res;
+    setState({ dialog: d });
+    prev?.(null);
+  });
+}
 export function confirmDialog({ title, text, ok = 'تأیید', danger, check }) {
-  return new Promise((res) => { resolver = res; setState({ dialog: { kind: 'confirm', title, text, ok, danger, check } }); });
+  return openDialog({ kind: 'confirm', title, text, ok, danger, check });
 }
 export function promptDialog({ title, label, value = '', ok = 'ذخیره', maxLength = 128, dir, textarea, type }) {
-  return new Promise((res) => { resolver = res; setState({ dialog: { kind: 'prompt', title, label, value, ok, maxLength, dir, textarea, type } }); });
+  return openDialog({ kind: 'prompt', title, label, value, ok, maxLength, dir, textarea, type });
 }
 export function Dialog() {
   const d = useStore((s) => s.dialog);

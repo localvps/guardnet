@@ -3,9 +3,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
-import { PORT, HOST, FRONTEND_DIST, ADMIN_DIST, BRAND } from './config.js';
+import { PORT, HOST, FRONTEND_DIST, ADMIN_DIST, BRAND, TRUST_PROXY } from './config.js';
 import { securityHeaders, clientIp } from './lib/security.js';
-import { ipBlocked } from './lib/settings.js';
+import { ipBlocked, sys } from './lib/settings.js';
 import { router as authRouter } from './routes/auth.js';
 import { router as meRouter } from './routes/me.js';
 import { router as socialRouter } from './routes/social.js';
@@ -20,7 +20,9 @@ import { startScheduler } from './system.js';
 
 const app = express();
 app.disable('x-powered-by');
-app.set('trust proxy', true);
+// Only when actually behind a reverse proxy: otherwise any client could spoof X-Forwarded-For
+// and x-forwarded-proto (rate-limit / lockout evasion, forged audit IPs, bogus HSTS).
+app.set('trust proxy', TRUST_PROXY);
 app.use(securityHeaders);
 
 // CORS: bearer-token API (no cookies), so any origin may call it safely.
@@ -54,7 +56,7 @@ app.use('/api/auth', (req, res, next) => {
     let vid = m ? m[1] : null;
     if (!vid) {
       vid = crypto.randomBytes(24).toString('base64url');
-      const secure = req.secure || req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+      const secure = req.secure ? '; Secure' : '';
       res.setHeader('Set-Cookie', `gn_vid=${vid}; Path=/api/auth; HttpOnly; SameSite=Strict; Max-Age=31536000${secure}`);
     }
     req.headers['x-visitor-id'] = 'c:' + vid;
@@ -63,6 +65,13 @@ app.use('/api/auth', (req, res, next) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true, name: BRAND, time: Date.now() }));
+
+// Maintenance mode from the admin panel: the API answers 503; health and the admin API stay up.
+app.use('/api', (req, res, next) => {
+  const S = sys();
+  if (!S.maintenance || req.path === '/health') return next();
+  res.status(503).json({ error: S.maintenance_msg || 'GuardNet در حال به‌روزرسانی است. کمی بعد دوباره تلاش کنید.', code: 'maintenance' });
+});
 app.use('/api/auth', authRouter);
 app.use('/api', meRouter);
 app.use('/api', socialRouter);

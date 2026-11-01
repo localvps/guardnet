@@ -250,7 +250,6 @@ function SearchResults({ q, onDone }) {
   const [res, setRes] = useState(null);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState('chats');
-  const [recent, setRecent] = useState([]);
   useEffect(() => {
     if (!q) { setRes(null); return undefined; }
     setLoading(true);
@@ -264,7 +263,7 @@ function SearchResults({ q, onDone }) {
     const s = q.toLowerCase().replace(/^@/, '');
     return sortedChats(chats).concat(sortedChats(chats, { archived: true })).filter((c) => chatTitle(c).toLowerCase().includes(s) || (c.type === 'private' ? peerOf(c)?.username : c.username)?.toLowerCase().includes(s));
   }, [q, chats]);
-  const pick = (fn) => { setRecent((r) => r); fn(); onDone(); };
+  const pick = (fn) => { fn(); onDone(); };
   if (!q) {
     const top = sortedChats(chats).filter((c) => c.type === 'private' && c.peer_id !== meId()).slice(0, 12);
     return (
@@ -318,7 +317,7 @@ function SearchResults({ q, onDone }) {
       {tab === 'messages' && (
         <>
           {(res?.messages || []).map((m) => {
-            const c = res.msg_chats.find((x) => x.id === m.chat_id) || chats.get(m.chat_id);
+            const c = (res?.msg_chats || []).find((x) => x.id === m.chat_id) || chats.get(m.chat_id);
             return (
               <div key={m.id} className="chat-item" onClick={() => pick(() => openChat(m.chat_id, { jumpTo: m.id }))}>
                 <Avatar {...chatAvatarProps(c)} size="var(--av)" />
@@ -354,6 +353,7 @@ function NewFab() {
 /* ------------------------------------------------------------------ drawer */
 function Drawer({ open, onClose }) {
   const me = useStore((s) => s.me);
+  const chats = useStore((s) => s.chats); // reactive: a getState() read here would never re-render
   const theme = me?.settings?.theme || 'dark';
   const dark = theme !== 'light';
   useEffect(() => {
@@ -364,7 +364,7 @@ function Drawer({ open, onClose }) {
   }, [open, onClose]);
   if (!me) return null;
   const go = (fn) => { onClose(); setTimeout(fn, 10); };
-  const saved = [...getState().chats.values()].find((c) => c.type === 'saved');
+  const saved = [...chats.values()].find((c) => c.type === 'saved');
   return (
     <div className={cx('drawer-layer', open && 'open')} onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }} aria-hidden={!open}>
       <nav className="drawer glass" aria-label="منوی اصلی">

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { q, q1, ex, run, now, likeEsc } from '../db.js';
 import { h, body, str, int, auth } from '../lib/http.js';
 import { err, rateHit, safeFileName } from '../lib/security.js';
-import { sec } from '../lib/settings.js';
+import { sec, sys } from '../lib/settings.js';
 import { PREMIUM_STICKERS, STICKER_PACK_SIZES, GIF_COUNT, MSG_TYPES } from '../config.js';
 import {
   J, userJson, messageJson, rowUser, rowChat, rowMsg, member, chatMemberIds, privatePeer, vis, canPost, blocked,
@@ -123,7 +123,7 @@ function validatePayload(u, type, text, data) {
     const f = q1('SELECT * FROM files WHERE id=? AND done=1', str(data.file, 40));
     if (!f) err(400, 'فایل پیوست یافت نشد.');
     if (f.owner !== u.id) err(403, 'دسترسی به فایل ندارید.');
-    if (f.size > limits(u).upload) err(403, 'حجم فایل از سقف مجاز بیشتر است.');
+    if (f.size > Math.min(limits(u).upload, sys().max_upload_mb * 1024 * 1024)) err(403, 'حجم فایل از سقف مجاز بیشتر است.');
     clean = { file: f.id, url: fileUrl(f.id), name: safeFileName(f.name), size: f.size, mime: f.mime };
     for (const k of ['w', 'h', 'dur']) if (num(data[k])) clean[k] = Math.max(0, Math.min(1e6, data[k]));
     if (type === 'voice' && Array.isArray(data.wave)) clean.wave = data.wave.slice(0, 64).map((x) => Math.round(Math.max(0, Math.min(1, +x || 0)) * 100) / 100);
@@ -175,7 +175,7 @@ chatScoped.post('/:cid/messages', h((req) => {
   const { c, m } = requireMember(cid, u.id);
   if (c.frozen) err(403, 'این گفتگو توسط مدیریت GuardNet مسدود شده است.');
   if (!canPost(c, m)) err(403, 'اجازه ارسال پیام در این گفتگو را ندارید.');
-  if (!rateHit(`msg:${u.id}`, sec().message_rate_per_min, 60e3)) err(429, 'پیام‌های زیادی فرستادید؛ چند لحظه صبر کنید.');
+  if (!rateHit(`msg:${u.id}`, sys().message_rate || sec().message_rate_per_min, 60e3)) err(429, 'پیام‌های زیادی فرستادید؛ چند لحظه صبر کنید.');
   const b = body(req);
   const type = str(b.type || 'text', 20); const text = str(b.text, 20000);
   // Anti-spam: burst + duplicate detection
@@ -222,7 +222,8 @@ router.post('/forward', h((req) => {
   const src = int(b.from_chat);
   const { c: sc } = requireMember(src, u.id);
   const ids = (Array.isArray(b.ids) ? b.ids : []).map((x) => int(x)).filter(Boolean).slice(0, 100);
-  const rows = ids.length ? q(`SELECT * FROM messages WHERE chat_id=? AND deleted=0 AND type<>'service' AND id IN (${ids.map(() => '?').join(',')}) ORDER BY id`, src, ...ids) : [];
+  // vis() matters: without it a forward could copy self-destructed / hidden / expired messages.
+  const rows = ids.length ? q(`SELECT m.* FROM messages m WHERE m.chat_id=? AND m.deleted=0 AND m.type<>'service' AND (m.expires_at IS NULL OR m.expires_at>?) AND m.id IN (${ids.map(() => '?').join(',')}) ${vis(u.id)} ORDER BY m.id`, src, now(), ...ids) : [];
   if (!rows.length) err(400, 'پیامی برای بازارسال انتخاب نشده است.');
   let sent = 0;
   for (const t of (Array.isArray(b.to) ? b.to : []).slice(0, 20)) {
@@ -306,6 +307,8 @@ router.post('/:mid/react', h((req) => {
   const { m, c, mem } = ownMsg(mid, u.id);
   if (!mem) err(403, 'برای واکنش ابتدا عضو شوید.');
   const e = str(body(req).emoji, 16);
+  // Only real emoji: prevents arbitrary text/HTML-ish junk in the reaction column.
+  if (e && !/^[\p{Extended_Pictographic}\p{Emoji_Component}‍️⃣]+$/u.test(e)) err(400, 'واکنش نامعتبر است.');
   const cur = q1('SELECT emoji FROM reactions WHERE msg_id=? AND user_id=?', mid, u.id);
   if (!e || cur?.emoji === e) run('DELETE FROM reactions WHERE msg_id=? AND user_id=?', mid, u.id);
   else {

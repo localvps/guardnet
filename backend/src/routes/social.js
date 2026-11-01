@@ -32,7 +32,7 @@ router.get('/search', h((req) => {
   const s = str(req.query.q, 64).trim().replace(/^@/, '');
   if (!s) return { users: [], chats: [], messages: [], msg_chats: [], msg_users: [] };
   const like = likeEsc(s);
-  const users = q(`SELECT * FROM users WHERE deleted=0 AND banned=0 AND (pass_hash IS NOT NULL OR verified=1)
+  const users = q(`SELECT * FROM users WHERE deleted=0 AND banned=0 AND is_bot=0 AND (pass_hash IS NOT NULL OR verified=1)
     AND (username LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\') ORDER BY (username=? COLLATE NOCASE) DESC, verified DESC, id LIMIT 25`, like, like, s);
   const chats = q(`SELECT * FROM chats WHERE is_public=1 AND type IN ('group','channel') AND (username LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\') LIMIT 20`, like, like);
   const msgs = q(`SELECT m.* FROM messages m JOIN members mb ON mb.chat_id=m.chat_id AND mb.user_id=? AND mb.left=0
